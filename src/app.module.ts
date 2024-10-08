@@ -10,11 +10,11 @@ import { MinigameModule } from './minigame/minigame.module';
 
 @Module({
   imports: [
-    MongooseModule.forRoot(process.env.URI_DATABASE),
     ConfigModule.forRoot({
       isGlobal: true,
       envFilePath: '.env',
     }),
+    MongooseModule.forRoot(process.env.URI_DATABASE),
     BotModule,
     UserModule,
     ServiceModule,
