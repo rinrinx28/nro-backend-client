@@ -17,6 +17,13 @@ export class AppController {
   }
 
   // API 2: Cập nhật thông tin Bot
+  //   + id: id của bot
+  //   + name: tên của bot (hexstring)
+  //   + map: tên map đứng treo (hexstring)
+  //   + zone: khu vực đứng treo
+  //   + type_money: loại tiền trong bot: 1 - vàng, 2 - thỏi vàng
+  //   + money: số vàng/thỏi vàng còn lại trong bot
+  // - web nhận được data -> trả về ok nếu không client sẽ call tiếp sau 5s
   @Get('/client/:UUID/bot')
   async updateInfoBot(
     @Param('UUID') uuid: string,
@@ -24,11 +31,12 @@ export class AppController {
     @Query('name') name: string,
     @Query('map') map: string,
     @Query('zone') zone: string,
-    @Query('gold') gold: string,
+    @Query('type_money') type_money: string,
+    @Query('money') money: string,
     @Query('server') server: string,
   ) {
     console.log(
-      `UUID: ${uuid} - BotId: ${id} - Bot Name: ${name} - Bot Map: ${map} - Bot zone: ${zone} - Bot Gold: ${gold} - Bot Server: ${server}`,
+      `UUID: ${uuid} - BotId: ${id} - Bot Name: ${name} - Bot Map: ${map} - Bot zone: ${zone} - Bot Type Gold: ${type_money} - Bot Gold: ${money} - Bot Server: ${server}`,
     );
     return 'ok';
   }
