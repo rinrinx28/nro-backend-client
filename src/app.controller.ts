@@ -50,7 +50,7 @@ export class AppController {
     @Query('player_id') player_id: string,
     @Query('player_name') player_name: string,
     @Query('server') server: string,
-    @Query('server_id') service_id: string,
+    @Query('service_id') service_id: string,
     @Query('money_last') money_last: string,
     @Query('money_current') money_current: string,
     @Query('money_trade') money_trade: string,
