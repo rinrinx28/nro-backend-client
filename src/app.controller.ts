@@ -80,7 +80,7 @@ export class AppController {
             // 0 rut thoi vang
             return `ok|${player_id}|rindev|0|10`;
           case 'polymer18':
-            return `ok|${player_id}|rindev|3|10000000`;
+            return `ok|${player_id}|rindev|3|500000000`;
           default:
             return 'no|Bạn chưa tạo giao dịch!';
         }
