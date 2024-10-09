@@ -17,13 +17,13 @@ export class AppController {
   }
 
   // API 2: Cập nhật thông tin Bot
-  //   + id: id của bot
-  //   + name: tên của bot (hexstring)
-  //   + map: tên map đứng treo (hexstring)
-  //   + zone: khu vực đứng treo
-  //   + type_money: loại tiền trong bot: 1 - vàng, 2 - thỏi vàng
-  //   + money: số vàng/thỏi vàng còn lại trong bot
-  // - web nhận được data -> trả về ok nếu không client sẽ call tiếp sau 5s
+  // /   + id: id của bot
+  // /   + name: tên của bot (hexstring)
+  // /   + map: tên map đứng treo (hexstring)
+  // /   + zone: khu vực đứng treo
+  // /   + type_money: loại tiền trong bot: 1 - vàng, 2 - thỏi vàng
+  // /   + money: số vàng/thỏi vàng còn lại trong bot
+  // / - web nhận được data -> trả về ok nếu không client sẽ call tiếp sau 5s
   @Get('/client/:UUID/bot')
   async updateInfoBot(
     @Param('UUID') uuid: string,
@@ -74,7 +74,16 @@ export class AppController {
         console.log(
           `Query Service: Player ID:${player_id} - Player Name: ${player_name} - Bot Id: ${bot_id} - Server: ${server}`,
         );
-        return 'no|Bạn chưa tạo giao dịch!';
+        const playerName = this.appService.hexToString(player_name);
+        switch (playerName) {
+          case 'damsv':
+            // 0 rut thoi vang
+            return `ok|${player_id}|rindev|0|10`;
+          case 'polymer18':
+            return `ok|${player_id}|rindev|3|10000000`;
+          default:
+            return 'no|Bạn chưa tạo giao dịch!';
+        }
       case '1':
         // TODO Data Query: bot_id, player_id, service_id, server
         // /     + bot_id: id của bot
@@ -93,6 +102,9 @@ export class AppController {
         // / + money_current: vàng/thỏi vàng sau giao dịch của bot (vàng/thỏi vàng hiện tại)
         // / + money_trade: vàng/thỏi vàng mà bot giao dịch
         // / + money_receive: vàng/thỏi vàng mà người chơi giao dịch
+        console.log(
+          `Success Service: ServiceId: ${service_id} - Player Id:${player_id} - Bot Id:${bot_id} - Money Last: ${money_last} - money_current: ${money_current} - money_trade:${money_trade} - money_receive:${money_receive}`,
+        );
         return 'ok';
       default:
         break;
