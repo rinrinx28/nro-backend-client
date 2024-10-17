@@ -1,9 +1,21 @@
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { AppService } from './app.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
+import {
+  ServiceEvent,
+  BotStatuEvent,
+  NoticeInfoEvent,
+  BotMoney,
+} from './middle-event/dto/dto.event';
+import { ServiceService } from './service/service.service';
 
 @Controller('api')
 export class AppController {
-  constructor(private readonly appService: AppService) {}
+  constructor(
+    private readonly appService: AppService,
+    private readonly eventEmit: EventEmitter2,
+    private service: ServiceService,
+  ) {}
 
   // API 1: Nhân kết quả thông báo
   @Get('/client/:UUID/info')
@@ -12,7 +24,12 @@ export class AppController {
     @Query('text') text: string,
     @Query('server') server: string,
   ) {
-    console.log(`UUID: ${uuid} - Text: ${text} - Server: ${server}`);
+    let payload: NoticeInfoEvent = {
+      content: this.appService.hexToString(text),
+      server: server,
+      uuid: uuid,
+    };
+    this.eventEmit.emitAsync('notice.info', payload);
     return 'ok';
   }
 
@@ -35,9 +52,17 @@ export class AppController {
     @Query('money') money: string,
     @Query('server') server: string,
   ) {
-    console.log(
-      `UUID: ${uuid} - BotId: ${id} - Bot Name: ${name} - Bot Map: ${map} - Bot zone: ${zone} - Bot Type Gold: ${type_money} - Bot Gold: ${money} - Bot Server: ${server}`,
-    );
+    let payload: BotStatuEvent = {
+      id: id,
+      uuid: uuid,
+      name: this.appService.hexToString(name),
+      map: this.appService.hexToString(map),
+      zone: zone,
+      type_money: type_money as BotMoney,
+      money: Number(money),
+      server: server,
+    };
+    this.eventEmit.emitAsync('bot.status', payload);
     return 'ok';
   }
 
@@ -71,19 +96,24 @@ export class AppController {
         // / - (*1) Lưu ý rằng: nếu 1 giao dịch cho timeout là 10 phút thì nếu quá 8 phút sẽ mặc định trả về no và sau 10 phút mới cho bấm hủy giao dịch (mặc định 2 phút ở giữa)
         // / nếu không xử lí như này thì người chơi sẽ giao dịch với bot và bấm trên web cùng lúc hủy -> gây bug
         // / - Mỗi user chỉ được 1 giao dịch, hoàn thành xong mới cho tạo tiếp
-        console.log(
-          `Query Service: Player ID:${player_id} - Player Name: ${player_name} - Bot Id: ${bot_id} - Server: ${server}`,
-        );
         const playerName = this.appService.hexToString(player_name);
-        switch (playerName) {
-          case 'damsv':
-            // 0 rut thoi vang
-            return `ok|${player_id}|rindev|0|10`;
-          case 'polymer18':
-            return `ok|${player_id}|rindev|3|500000000`;
-          default:
-            return 'no|Bạn chưa tạo giao dịch!';
-        }
+        const service = await this.service.getServiceWithPlayerName(playerName);
+        if (typeof service === 'string') return `no|${service}`;
+        const { _id, type, amount } = service;
+        await this.service.updateService({
+          id: _id,
+          typeUpdate: '0',
+          data: {
+            playerId: player_id,
+            playerName: playerName,
+            bot_id: bot_id,
+          },
+          realAmount: {
+            money_trade: Number(money_trade ?? 0),
+            money_receive: Number(money_receive ?? 0),
+          },
+        });
+        return `ok|${player_id}|${_id}|${type}|${amount}`;
       case '1':
         // TODO Data Query: bot_id, player_id, service_id, server
         // /     + bot_id: id của bot
@@ -92,20 +122,36 @@ export class AppController {
         // / - web nhận được data -> trả về ok
         // / - api này tạm thời chỉ để lưu log -> sau có thể check để cho vào danh sách đen, giao dịch trong game bị hủy nhưng giao dịch trên web vẫn để đó,
         // / không tự động xóa khi chưa vượt timeout để cho phép người chơi bấm hủy
-        console.log(
-          `Cancel Service: ServiceId: ${service_id} - Player Id: ${player_id} - Bot Id: ${bot_id}`,
-        );
-        return 'ok';
+        return this.service.updateService({
+          id: service_id,
+          typeUpdate: '1',
+          data: {
+            isEnd: true,
+            status: '1',
+          },
+          realAmount: {
+            money_trade: Number(money_trade ?? 0),
+            money_receive: Number(money_receive ?? 0),
+          },
+        });
       case '2':
         // TODO Data Query: bot_id, player_id, service_id, money_last, money_current, money_trade, money_receive, server
         // / + money_last: vàng/thỏi vàng trước giao dịch của bot
         // / + money_current: vàng/thỏi vàng sau giao dịch của bot (vàng/thỏi vàng hiện tại)
         // / + money_trade: vàng/thỏi vàng mà bot giao dịch
         // / + money_receive: vàng/thỏi vàng mà người chơi giao dịch
-        console.log(
-          `Success Service: ServiceId: ${service_id} - Player Id:${player_id} - Bot Id:${bot_id} - Money Last: ${money_last} - money_current: ${money_current} - money_trade:${money_trade} - money_receive:${money_receive}`,
-        );
-        return 'ok';
+        return this.service.updateService({
+          id: service_id,
+          typeUpdate: '2',
+          data: {
+            isEnd: true,
+            status: '2',
+          },
+          realAmount: {
+            money_trade: Number(money_trade ?? 0),
+            money_receive: Number(money_receive ?? 0),
+          },
+        });
       default:
         break;
     }

@@ -2,10 +2,6 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class AppService {
-  getHello(): string {
-    return 'Hello World!';
-  }
-
   hexToString(hex: any): string {
     try {
       // Remove any spaces or other non-hex characters
