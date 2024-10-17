@@ -1,6 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Date, HydratedDocument, Types } from 'mongoose';
-import { User } from 'src/user/schema/user.schema';
 
 export type ServiceDocument = HydratedDocument<Service>;
 
@@ -10,7 +9,7 @@ type TypeService = '0' | '1' | '2' | '3';
   timestamps: true,
 })
 export class Service {
-  @Prop({ type: Types.ObjectId, ref: User.name })
+  @Prop({ type: Types.ObjectId, ref: `User` })
   uid: Types.ObjectId;
 
   @Prop()

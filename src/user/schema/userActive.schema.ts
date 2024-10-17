@@ -1,7 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Date, HydratedDocument, Types } from 'mongoose';
-import { Service } from 'src/service/schema/service.schema';
-import { User } from './user.schema';
+import { Date, HydratedDocument, SchemaTypes, Types } from 'mongoose';
 
 export type UserActiveDocument = HydratedDocument<UserActive>;
 
@@ -10,10 +8,10 @@ export type UserActiveDocument = HydratedDocument<UserActive>;
 })
 export class UserActive {
   // One-to-many relationship with the User model
-  @Prop({ type: [{ type: Types.ObjectId, ref: User.name }] })
+  @Prop({ type: [{ type: Types.ObjectId, ref: `User` }] })
   uid: Types.ObjectId;
 
-  @Prop({ default: {} })
+  @Prop({ default: {}, type: SchemaTypes.Mixed })
   active: Record<string, any>;
 
   updatedAt?: Date;

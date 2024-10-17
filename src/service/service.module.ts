@@ -23,5 +23,6 @@ import {
     ]),
   ],
   providers: [ServiceService],
+  exports: [ServiceService],
 })
 export class ServiceModule {}
