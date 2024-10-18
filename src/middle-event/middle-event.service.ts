@@ -87,7 +87,7 @@ export class MiddleEventService {
       const s_res = this.showResult(res.result);
       // Let send prizes to winers;
       const e_bet = await this.eConfigModel.findOne({ name: 'e_bet' });
-      let option = e_bet.option;
+      let { cl = 1.95, x = 3.2, g = 70 } = e_bet.option;
 
       // Let list user join the BET;
       let users: { uid: string; revice: number }[] = [];
@@ -101,7 +101,7 @@ export class MiddleEventService {
       for (const user_bet of users_bet) {
         const { place, typeBet, amount, uid } = user_bet;
         if (typeBet === 'cl') {
-          let rate = option['cl'];
+          let rate = cl;
           if (s_res.split('_')[0].includes(place)) {
             user_bet.revice = amount * rate;
             users.push({
@@ -110,7 +110,7 @@ export class MiddleEventService {
             });
           }
         } else if (typeBet === 'x') {
-          let rate = option['x'];
+          let rate = x;
           if (s_res.split('_')[0].includes(place)) {
             user_bet.revice = amount * rate;
             users.push({
@@ -119,7 +119,7 @@ export class MiddleEventService {
             });
           }
         } else {
-          let rate = option['g'];
+          let rate = g;
           if (s_res.split('_')[1] === place) {
             user_bet.revice = amount * rate;
             users.push({
