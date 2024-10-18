@@ -7,6 +7,7 @@ import {
   UserActive,
   UserActiveSchema,
 } from 'src/user/schema/userActive.schema';
+import { SocketModule } from 'src/socket/socket.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import {
         schema: UserActiveSchema,
       },
     ]),
+    SocketModule,
   ],
   providers: [ServiceService],
   exports: [ServiceService],

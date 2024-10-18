@@ -1,5 +1,6 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import { Date, HydratedDocument } from 'mongoose';
+import { BotMoney } from 'src/middle-event/dto/dto.event';
 
 export type BotDocument = HydratedDocument<Bot>;
 
@@ -7,14 +8,26 @@ export type BotDocument = HydratedDocument<Bot>;
   timestamps: true,
 })
 export class Bot {
-  @Prop()
-  name: string;
-
   @Prop({ unique: true })
   id: string;
 
-  @Prop({ default: 0 })
-  gold: number;
+  @Prop()
+  uuid: string;
+
+  @Prop()
+  name: string;
+
+  @Prop()
+  map: string;
+
+  @Prop()
+  zone: string;
+
+  @Prop()
+  type_money: BotMoney;
+
+  @Prop()
+  money: number;
 
   @Prop()
   server: string;

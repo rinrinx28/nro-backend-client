@@ -4,6 +4,7 @@ import { Service } from './schema/service.schema';
 import { Model } from 'mongoose';
 import { User } from 'src/user/schema/user.schema';
 import { UserActive } from 'src/user/schema/userActive.schema';
+import { SocketGateway } from 'src/socket/socket.gateway';
 
 interface UpdateService {
   id: string;
@@ -29,6 +30,7 @@ export class ServiceService {
     private readonly userModel: Model<User>,
     @InjectModel(UserActive.name)
     private readonly userActiveModel: Model<UserActive>,
+    private readonly socketGateway: SocketGateway,
   ) {}
 
   private logger: Logger = new Logger('Service');
@@ -64,6 +66,7 @@ export class ServiceService {
       if (!target_s) throw new Error('Không tìm thấy Giao Dịch');
       this.logger.log(`Update Service: ${id} - Status: ${typeUpdate}`);
       const { type, amount, uid } = target_s.toObject();
+      let service = target_s.toObject();
       switch (typeUpdate) {
         case '0':
           await this.serviceModel.findByIdAndUpdate(id, data);
@@ -77,6 +80,8 @@ export class ServiceService {
             typeUpdate,
             realAmount,
           });
+          service = { ...service, ...data };
+          this.socketGateway.server.emit('service.update', service);
           return 'ok';
         default:
           await this.serviceModel.findByIdAndUpdate(id, {
@@ -94,6 +99,14 @@ export class ServiceService {
             typeUpdate,
             realAmount,
           });
+          service = {
+            ...service,
+            ...data,
+            revice: ['0', '1'].includes(type)
+              ? realAmount.money_trade
+              : realAmount.money_receive,
+          };
+          this.socketGateway.server.emit('service.update', service);
           return 'ok';
       }
     } catch (err: any) {
@@ -106,7 +119,9 @@ export class ServiceService {
 
   async updateUserWithType(payload: UpdateUserWithTypeService) {
     const { type, amount, uid, typeUpdate, realAmount } = payload;
-    const { money } = await this.userModel.findById(uid);
+    const target_u = await this.userModel.findById(uid);
+    let user = target_u.toObject();
+    let { money } = user;
 
     if (typeUpdate === '1') {
       // Refund money to User;
@@ -131,6 +146,10 @@ export class ServiceService {
               m_new: money + refund_money_rgold,
             },
           });
+          this.socketGateway.server.emit('user.update', {
+            ...user,
+            money: money + refund_money_rgold,
+          });
           return;
         // Rut Vang (gold)
         case '1':
@@ -150,6 +169,10 @@ export class ServiceService {
               m_current: money,
               m_new: money + amount,
             },
+          });
+          this.socketGateway.server.emit('user.update', {
+            ...user,
+            money: money + amount,
           });
           return;
         // Nap thoi vang
@@ -225,6 +248,10 @@ export class ServiceService {
               m_new: money + deposit_rgold,
             },
           });
+          this.socketGateway.server.emit('user.update', {
+            ...user,
+            money: money + deposit_rgold,
+          });
           return;
         // Nap vang
         default:
@@ -242,6 +269,10 @@ export class ServiceService {
               m_current: money,
               m_new: money + realAmount.money_receive,
             },
+          });
+          this.socketGateway.server.emit('user.update', {
+            ...user,
+            money: money + realAmount.money_receive,
           });
           return;
       }

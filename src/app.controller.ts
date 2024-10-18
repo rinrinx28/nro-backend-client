@@ -29,9 +29,7 @@ export class AppController {
       server: server,
       uuid: uuid,
     };
-    if (server === '1') {
-      this.eventEmit.emitAsync('notice.info', payload);
-    }
+    this.eventEmit.emitAsync('notice.info', payload);
     return 'ok';
   }
 

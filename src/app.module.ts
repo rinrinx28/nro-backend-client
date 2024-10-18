@@ -5,10 +5,11 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ConfigModule } from '@nestjs/config';
 import { BotModule } from './bot/bot.module';
 import { ServiceModule } from './service/service.module';
-import { MinigameModule } from './minigame/minigame.module';
-import { SocketGateway } from './socket/socket.gateway';
 import { EventEmitterModule } from '@nestjs/event-emitter';
-import { MiddleEventService } from './middle-event/middle-event.service';
+import { ScheduleModule } from '@nestjs/schedule';
+import { TasksService } from './task-service/task-service.service';
+import { MiddleEventModule } from './middle-event/middle-event.module';
+import { SocketModule } from './socket/socket.module';
 
 @Module({
   imports: [
@@ -17,12 +18,14 @@ import { MiddleEventService } from './middle-event/middle-event.service';
       envFilePath: '.env',
     }),
     MongooseModule.forRoot(process.env.URI_DATABASE),
+    ScheduleModule.forRoot(),
     EventEmitterModule.forRoot(),
     BotModule,
     ServiceModule,
-    MinigameModule,
+    MiddleEventModule,
+    SocketModule,
   ],
   controllers: [AppController],
-  providers: [AppService, SocketGateway, MiddleEventService],
+  providers: [AppService, TasksService],
 })
 export class AppModule {}
