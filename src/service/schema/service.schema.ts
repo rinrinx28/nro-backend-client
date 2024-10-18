@@ -9,7 +9,7 @@ type TypeService = '0' | '1' | '2' | '3';
   timestamps: true,
 })
 export class Service {
-  @Prop({ type: Types.ObjectId, ref: `User` })
+  @Prop()
   uid: Types.ObjectId;
 
   @Prop()
