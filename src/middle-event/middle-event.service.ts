@@ -38,7 +38,11 @@ export class MiddleEventService {
 
   @OnEvent('bot.status', { async: true })
   async handleBotStatus(payload: BotStatuEvent) {
-    const bot = await this.botModel.create(payload);
+    const bot = await this.botModel.findOneAndUpdate(
+      { id: payload.id },
+      payload,
+      { new: true, upsert: true },
+    );
     this.socketGateway.server.emit('bot.status', bot);
   }
 
