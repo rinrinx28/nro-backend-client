@@ -12,6 +12,7 @@ import { EConfig } from './schema/config.schema';
 import { UserBet } from 'src/user/schema/userBet.schema';
 import { Message } from 'src/user/schema/message.schema';
 import { Bot } from 'src/bot/schema/bot.schema';
+import { Clan } from './schema/clan.schema';
 
 @Injectable()
 export class MiddleEventService {
@@ -33,6 +34,8 @@ export class MiddleEventService {
     private readonly messageModel: Model<Message>,
     @InjectModel(Bot.name)
     private readonly botModel: Model<Bot>,
+    @InjectModel(Clan.name)
+    private readonly clanModel: Model<Clan>,
   ) {}
   private logger: Logger = new Logger('Middle Handler');
 

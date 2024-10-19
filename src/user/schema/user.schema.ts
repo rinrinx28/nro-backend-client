@@ -22,7 +22,19 @@ export class User {
   @Prop({ default: '' })
   email: string;
 
-  @Prop({ default: {}, type: SchemaTypes.Mixed })
+  @Prop({
+    default: {
+      totalTrade: 0,
+      limitTrade: 0,
+      trade: 0,
+      deposit: 0,
+      withdraw: 0,
+      totalScore: 0,
+      avatar: null,
+      vip: 0,
+    },
+    type: SchemaTypes.Mixed,
+  })
   meta: Record<string, any>;
 
   @Prop({ default: false })

@@ -43,13 +43,10 @@ export class ServiceService {
           isEnd: false,
         })
         .sort({ updatedAt: -1 });
-      if (!service)
-        throw new Error(
-          'Bạn chưa tạo giao dịch, xin vui lòng tạo ở NROGAME.ME!',
-        );
+      if (!service) throw new Error('bạn chưa tạo giao dịch tại nrogam e.m e');
       if (service.isEnd)
         throw new Error(
-          'Giao dịch đã hết hạn hoặc chưa tạo, xin vui lòng tạo mới ở NROGAME.ME!',
+          'giao dịch của bạn bị hủy, xin tạo lại tại nrogam e.m e',
         );
       this.logger.log(`Query Service ${playerName} - ${service.id}`);
       return service;
@@ -120,7 +117,7 @@ export class ServiceService {
   async updateUserWithType(payload: UpdateUserWithTypeService) {
     const { type, amount, uid, typeUpdate, realAmount } = payload;
     const target_u = await this.userModel.findById(uid);
-    let user = target_u.toObject();
+    let { pwd_h, ...user } = target_u.toObject();
     let { money } = user;
 
     if (typeUpdate === '1') {
