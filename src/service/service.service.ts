@@ -138,7 +138,7 @@ export class ServiceService {
               : realAmount.money_receive,
           };
           this.socketGateway.server.emit('service.update', service);
-          return 'ok';
+          return `ok|${data.playerId}|${service._id}|${service.type}|${service.amount}`;
       }
     } catch (err: any) {
       this.logger.log(

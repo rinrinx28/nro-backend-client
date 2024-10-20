@@ -100,7 +100,7 @@ export class AppController {
         const service = await this.service.getServiceWithPlayerName(playerName);
         if (typeof service === 'string') return `no|${service}`;
         const { _id, type, amount } = service;
-        await this.service.updateService({
+        return await this.service.updateService({
           id: _id,
           typeUpdate: '0',
           data: {
@@ -113,7 +113,6 @@ export class AppController {
             money_receive: Number(money_receive ?? 0),
           },
         });
-        return `ok|${player_id}|${_id}|${type}|${amount}`;
       case '1':
         // TODO Data Query: bot_id, player_id, service_id, server
         // /     + bot_id: id của bot
