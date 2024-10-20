@@ -382,8 +382,6 @@ export class MiddleEventService {
               latestSession.result === result ||
               latestSession.numbers.includes(latestSession.result.toString())
             ) {
-              this.logger.log('Valid data, continuing the session.');
-
               // Lưu phiên mới vào cơ sở dữ liệu
               const newSession = await this.SessionModel.findByIdAndUpdate(
                 latestSession.id,
@@ -417,8 +415,6 @@ export class MiddleEventService {
                 `Valid data, continuing the session. ${remainingTime} - ${result} - ${numbers.join('-')}`,
               );
             } else {
-              this.logger.log('saving new session.');
-
               const newSession = await this.SessionModel.create({
                 server: data.server,
                 content: data.content,
@@ -433,8 +429,6 @@ export class MiddleEventService {
               );
             }
           } else {
-            this.logger.log('saving new session.');
-
             const newSession = await this.SessionModel.create({
               server: data.server,
               content: data.content,
