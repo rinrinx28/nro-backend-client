@@ -317,7 +317,6 @@ export class MiddleEventService {
 
       if (match) {
         const result = parseInt(match[1], 10); // Kết quả giải trước
-        const numbers = match[3].split(',').map((num) => num.trim()); // Dãy số
         const remainingTime = parseInt(match[4], 10); // Thời gian còn lại
 
         // Tách giá trị cuối cùng trước dấu \b
@@ -340,37 +339,49 @@ export class MiddleEventService {
       if (parsedContent) {
         const { result, numbers, remainingTime } = parsedContent;
 
-        // Lấy phiên mới nhất từ cơ sở dữ liệu dựa vào uuid
+        // Lấy phiên mới nhất từ cơ sở dữ liệu dựa vào server và isEnd
         const latestSession = await this.SessionModel.findOne({
           server: data.server,
-          isEnd: false,
         }).sort({ receivedAt: -1 });
 
         if (latestSession) {
-          // So sánh với phiên mới nhất
-          if (
-            latestSession.result === result ||
-            latestSession.numbers.includes(latestSession.result.toString())
-          ) {
-            console.log('Valid data, continuing the session.');
-
-            // Lưu phiên mới vào cơ sở dữ liệu
-            const newSession = await this.SessionModel.findByIdAndUpdate(
+          // Kiểm tra nếu remainingTime là 0
+          if (remainingTime === 0) {
+            // Đánh dấu phiên hiện tại là đã kết thúc
+            const updatedSession = await this.SessionModel.findByIdAndUpdate(
               latestSession.id,
               {
-                server: data.server,
-                content: data.content,
-                result,
-                numbers,
-                remainingTime,
+                isEnd: true, // Đánh dấu phiên là đã kết thúc
                 receivedAt: new Date(),
-                isEnd: remainingTime === 0,
               },
-              { new: true, upsert: true },
+              { new: true },
             ).exec();
-            console.log('New session saved:', newSession);
+            console.log('Session ended:', updatedSession);
           } else {
-            console.log('Data is not valid, skipping...');
+            // So sánh với phiên mới nhất
+            if (
+              latestSession.result === result ||
+              latestSession.numbers.includes(latestSession.result.toString())
+            ) {
+              console.log('Valid data, continuing the session.');
+
+              // Lưu phiên mới vào cơ sở dữ liệu
+              const newSession = await this.SessionModel.findByIdAndUpdate(
+                latestSession.id,
+                {
+                  content: data.content,
+                  result,
+                  numbers,
+                  remainingTime,
+                  receivedAt: new Date(),
+                  isEnd: remainingTime === 0,
+                },
+                { new: true },
+              ).exec();
+              console.log('Session updated:', newSession);
+            } else {
+              console.log('Data is not valid, skipping...');
+            }
           }
         } else {
           console.log('No previous session found, saving new session.');
@@ -382,6 +393,7 @@ export class MiddleEventService {
             numbers,
             remainingTime,
             receivedAt: new Date(),
+            isEnd: remainingTime === 0,
           });
           console.log('New session saved:', newSession);
         }
@@ -391,6 +403,12 @@ export class MiddleEventService {
     } catch (err: any) {
       console.log(err);
     }
+  }
+  // Hàm ghi log dữ liệu trễ
+  async logDelayedData(data: IData) {
+    // Thực hiện ghi log hoặc lưu trữ dữ liệu trễ
+    console.log('Logging delayed data:', data.content);
+    // Có thể tạo một mô hình mới để lưu trữ thông tin về dữ liệu trễ nếu cần
   }
 }
 
