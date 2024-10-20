@@ -310,16 +310,21 @@ export class MiddleEventService {
   //TODO ———————————————[Handler notice info]———————————————
   parseContent(content: string) {
     try {
+      // Cập nhật biểu thức chính quy để bao gồm dấu \b
       const regex =
         /Kết quả giải trước: (\d+).*?(\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
       const match = content.match(regex);
 
       if (match) {
-        const result = parseInt(match[1], 10);
-        const numbers = match[2].split(',').map((num) => num.trim());
-        const remainingTime = parseInt(match[4], 10);
+        const result = parseInt(match[1], 10); // Kết quả giải trước
+        const numbers = match[3].split(',').map((num) => num.trim()); // Dãy số
+        const remainingTime = parseInt(match[4], 10); // Thời gian còn lại
 
-        return { result, numbers, remainingTime };
+        // Tách giá trị cuối cùng trước dấu \b
+        const lastValueWithB = match[3]; // Giá trị trước dấu \b
+        const lastValue_split = lastValueWithB.split('\b')[0].split(','); // Tách ra để lấy giá trị
+        const lastValue = lastValue_split[lastValue_split.length - 1];
+        return { result, numbers: [lastValue], remainingTime };
       }
 
       return null;
