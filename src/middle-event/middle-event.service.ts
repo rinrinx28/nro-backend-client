@@ -312,7 +312,7 @@ export class MiddleEventService {
     try {
       // Sử dụng biểu thức chính quy để lấy kết quả giải trước, dãy số và thời gian còn lại
       const regex =
-        /Kết quả giải trước: (\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
+        /Kết quả giải trước: (\d+).*?(\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
       const match = content.match(regex);
 
       if (match) {
