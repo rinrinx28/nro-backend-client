@@ -338,6 +338,7 @@ export class MiddleEventService {
         // Lấy phiên mới nhất từ cơ sở dữ liệu dựa vào uuid
         const latestSession = await this.SessionModel.findOne({
           uuid: data.uuid,
+          server: data.server,
         }).sort({ receivedAt: -1 });
 
         if (latestSession) {
