@@ -350,15 +350,19 @@ export class MiddleEventService {
             console.log('Valid data, continuing the session.');
 
             // Lưu phiên mới vào cơ sở dữ liệu
-            const newSession = await this.SessionModel.create({
-              uuid: data.uuid,
-              server: data.server,
-              content: data.content,
-              result,
-              numbers,
-              remainingTime,
-              receivedAt: new Date(),
-            });
+            const newSession = await this.SessionModel.findByIdAndUpdate(
+              latestSession.id,
+              {
+                uuid: data.uuid,
+                server: data.server,
+                content: data.content,
+                result,
+                numbers,
+                remainingTime,
+                receivedAt: new Date(),
+              },
+              { new: true, upsert: true },
+            );
             console.log('New session saved:', newSession);
           } else {
             console.log('Data is not valid, skipping...');
