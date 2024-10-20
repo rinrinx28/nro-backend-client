@@ -619,7 +619,7 @@ export class MiddleEventService {
   async CreateNewMiniGame(payload: CreateMiniGame) {
     try {
       const newMiniGame = await this.miniGameModel.create(payload);
-      this.socketGateway.server.emit('mini.info', {
+      this.socketGateway.server.emit('mini.bet', {
         n_game: newMiniGame.toObject(),
       });
     } catch (err: any) {
