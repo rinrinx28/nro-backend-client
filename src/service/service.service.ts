@@ -144,7 +144,7 @@ export class ServiceService {
       this.logger.log(
         `Update Service Err: ${payload.id} - Status: ${payload.typeUpdate} - Msg: ${err.message}`,
       );
-      return 'ok';
+      return `no|${err.message}`;
     }
   }
 
