@@ -138,13 +138,13 @@ export class ServiceService {
               : realAmount.money_receive,
           };
           this.socketGateway.server.emit('service.update', service);
-          return `ok|${data.playerId}|${service._id}|${service.type}|${service.amount}`;
+          return 'ok';
       }
     } catch (err: any) {
       this.logger.log(
         `Update Service Err: ${payload.id} - Status: ${payload.typeUpdate} - Msg: ${err.message}`,
       );
-      return `no|${err.message}`;
+      return `ok`;
     }
   }
 
