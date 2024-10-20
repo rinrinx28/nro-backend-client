@@ -1,5 +1,5 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Date, HydratedDocument } from 'mongoose';
+import { Date, HydratedDocument, SchemaTypes } from 'mongoose';
 
 export type UserBetDocument = HydratedDocument<UserBet>;
 
@@ -20,6 +20,9 @@ export type typeBet = 'cl' | 'g' | 'x';
   timestamps: true,
 })
 export class UserBet {
+  @Prop({ default: {}, type: SchemaTypes.Mixed })
+  meta: Record<string, any>;
+
   @Prop()
   betId: string;
 

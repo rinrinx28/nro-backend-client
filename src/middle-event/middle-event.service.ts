@@ -54,6 +54,23 @@ export class MiddleEventService {
     console.log(payload);
   }
 
+  @OnEvent('mini.bet.info', { async: true })
+  async handlerMiniInfo(server: string) {
+    try {
+      const n_game = await this.miniGameModel
+        .findOne({ server: server, isEnd: false })
+        .sort({ updatedAt: -1 });
+      if (n_game) {
+        this.socketGateway.server.emit('mini.bet', {
+          n_game: n_game.toObject(),
+        });
+      }
+    } catch (err: any) {
+      this.logger.log(`Err Mini BET Info: Msg: ${err.message}`);
+      this.socketGateway.server.emit('mini.bet', { err: err.message });
+    }
+  }
+
   @OnEvent('mini.server.24', { async: true })
   async handleMiniServer24(status: string) {
     try {
@@ -93,7 +110,7 @@ export class MiddleEventService {
       let { cl = 1.95, x = 3.2, g = 70 } = e_bet.option;
 
       // Let list user join the BET;
-      let users: { uid: string; revice: number }[] = [];
+      let users: { uid: string; revice: number; place: string }[] = [];
       let userBets = [];
       let users_bet = await this.userBetModel.find({
         betId: old_game.id,
@@ -110,6 +127,7 @@ export class MiddleEventService {
             users.push({
               uid,
               revice: amount * rate,
+              place: place,
             });
           }
         } else if (typeBet === 'x') {
@@ -119,6 +137,7 @@ export class MiddleEventService {
             users.push({
               uid,
               revice: amount * rate,
+              place: place,
             });
           }
         } else {
@@ -128,6 +147,7 @@ export class MiddleEventService {
             users.push({
               uid,
               revice: amount * rate,
+              place: place,
             });
           }
         }
@@ -147,22 +167,26 @@ export class MiddleEventService {
         },
       });
       for (const user of list_user) {
-        const { revice } = users.find((u) => u.uid === user.id);
-        userActives.push({
-          uid: user.id,
-          active: {
-            name: 'winer_bet',
-            betId: old_game.id,
-            m_current: user.money,
-            m_new: user.money + revice,
-          },
-        });
-        user.money += revice;
-        await user.save();
+        const winner = users.filter((u) => u.uid === user.id);
+        for (const w of winner) {
+          const { revice } = w;
+          userActives.push({
+            uid: user.id,
+            active: {
+              name: 'winer_bet',
+              betId: old_game.id,
+              m_current: user.money,
+              m_new: user.money + revice,
+              place: w.place,
+            },
+          });
+          user.money += revice;
+          await user.save();
+          notices.push(
+            `Chức mừng người chơi ${user.name} đã cược thắng ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${w.place}`,
+          );
+        }
         users_res.push({ _id: user.id, money: user.money });
-        notices.push(
-          `Chức mừng người chơi ${user.name} đã cược thắng ${new Intl.NumberFormat('vi').format(revice)} vàng`,
-        );
       }
 
       // Save active
@@ -197,7 +221,7 @@ export class MiddleEventService {
       });
       const payload = {
         n_game: n_game.toObject(),
-        o_game: old_game.toObject(),
+        userBets: userBets,
         data_user: users_res,
       };
       this.socketGateway.server.emit('mini.bet', payload);
@@ -238,7 +262,7 @@ export class MiddleEventService {
 
   showResult(res: string) {
     let result = `${Number(res) > 9 ? res : `0${res}`}`;
-    let new_result = `${result}`.split('')[1];
+    let new_result = `${result}`[1];
     let obj_result = {
       c: Number(new_result) % 2 === 0,
       l: Number(new_result) % 2 !== 0,

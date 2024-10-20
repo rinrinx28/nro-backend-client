@@ -39,4 +39,9 @@ export class SocketGateway
   handleMiniServerRE(@MessageBody() id: any) {
     this.eventEmitter.emitAsync('mini.server.24.re', id);
   }
+
+  @SubscribeMessage('mini.bet.info')
+  handleInfoMini(@MessageBody() server: any) {
+    this.eventEmitter.emitAsync('mini.bet.info', server);
+  }
 }
