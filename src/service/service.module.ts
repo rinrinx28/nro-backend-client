@@ -8,6 +8,7 @@ import {
   UserActiveSchema,
 } from 'src/user/schema/userActive.schema';
 import { SocketModule } from 'src/socket/socket.module';
+import { EConfig, EConfigSchema } from 'src/middle-event/schema/config.schema';
 
 @Module({
   imports: [
@@ -20,6 +21,10 @@ import { SocketModule } from 'src/socket/socket.module';
       {
         name: UserActive.name,
         schema: UserActiveSchema,
+      },
+      {
+        name: EConfig.name,
+        schema: EConfigSchema,
       },
     ]),
     SocketModule,

@@ -15,6 +15,7 @@ import { SocketModule } from 'src/socket/socket.module';
 import { Message, MessageSchema } from 'src/user/schema/message.schema';
 import { Bot, BotSchema } from 'src/bot/schema/bot.schema';
 import { Clan, ClanSchema } from './schema/clan.schema';
+import { Session, SessionSchema } from './schema/ISession.schema';
 
 @Module({
   imports: [
@@ -49,6 +50,7 @@ import { Clan, ClanSchema } from './schema/clan.schema';
       },
       { name: Bot.name, schema: BotSchema },
       { name: Clan.name, schema: ClanSchema },
+      { name: Session.name, schema: SessionSchema },
     ]),
     SocketModule,
   ],

@@ -13,6 +13,13 @@ import { UserBet } from 'src/user/schema/userBet.schema';
 import { Message } from 'src/user/schema/message.schema';
 import { Bot } from 'src/bot/schema/bot.schema';
 import { Clan } from './schema/clan.schema';
+import { Session } from './schema/ISession.schema';
+
+interface IData {
+  uuid: string;
+  server: string;
+  content: string;
+}
 
 @Injectable()
 export class MiddleEventService {
@@ -36,6 +43,8 @@ export class MiddleEventService {
     private readonly botModel: Model<Bot>,
     @InjectModel(Clan.name)
     private readonly clanModel: Model<Clan>,
+    @InjectModel(Session.name)
+    private readonly SessionModel: Model<Session>,
   ) {}
   private logger: Logger = new Logger('Middle Handler');
 
@@ -296,6 +305,75 @@ export class MiddleEventService {
   }) {
     const msg = await this.messageModel.create(payload);
     this.socketGateway.server.emit('message-re', msg);
+  }
+
+  //TODO ———————————————[Handler notice info]———————————————
+  parseContent(content: string) {
+    const regex =
+      /Kết quả giải trước: (\d+).*?(\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
+    const match = content.match(regex);
+
+    if (match) {
+      const result = parseInt(match[1], 10);
+      const numbers = match[2].split(',').map((num) => num.trim());
+      const remainingTime = parseInt(match[4], 10);
+
+      return { result, numbers, remainingTime };
+    }
+
+    return null;
+  }
+
+  async processData(data: IData) {
+    const parsedContent = this.parseContent(data.content);
+
+    if (parsedContent) {
+      const { result, numbers, remainingTime } = parsedContent;
+
+      // Lấy phiên mới nhất từ cơ sở dữ liệu dựa vào uuid
+      const latestSession = await this.SessionModel.findOne({
+        uuid: data.uuid,
+      }).sort({ receivedAt: -1 });
+
+      if (latestSession) {
+        // So sánh với phiên mới nhất
+        if (
+          latestSession.result === result ||
+          latestSession.numbers.includes(latestSession.result.toString())
+        ) {
+          console.log('Valid data, continuing the session.');
+
+          // Lưu phiên mới vào cơ sở dữ liệu
+          const newSession = await this.SessionModel.create({
+            uuid: data.uuid,
+            server: data.server,
+            content: data.content,
+            result,
+            numbers,
+            remainingTime,
+            receivedAt: new Date(),
+          });
+          console.log('New session saved:', newSession);
+        } else {
+          console.log('Data is not valid, skipping...');
+        }
+      } else {
+        console.log('No previous session found, saving new session.');
+
+        const newSession = await this.SessionModel.create({
+          uuid: data.uuid,
+          server: data.server,
+          content: data.content,
+          result,
+          numbers,
+          remainingTime,
+          receivedAt: new Date(),
+        });
+        console.log('New session saved:', newSession);
+      }
+    } else {
+      console.log('Failed to parse content:', data.content);
+    }
   }
 }
 

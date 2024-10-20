@@ -5,6 +5,7 @@ import { Model } from 'mongoose';
 import { User } from 'src/user/schema/user.schema';
 import { UserActive } from 'src/user/schema/userActive.schema';
 import { SocketGateway } from 'src/socket/socket.gateway';
+import { EConfig } from 'src/middle-event/schema/config.schema';
 
 interface UpdateService {
   id: string;
@@ -30,6 +31,8 @@ export class ServiceService {
     private readonly userModel: Model<User>,
     @InjectModel(UserActive.name)
     private readonly userActiveModel: Model<UserActive>,
+    @InjectModel(EConfig.name)
+    private readonly EConfigModel: Model<EConfig>,
     private readonly socketGateway: SocketGateway,
   ) {}
 
@@ -58,11 +61,42 @@ export class ServiceService {
 
   async updateService(payload: UpdateService) {
     try {
+      const e_shop = await this.EConfigModel.findOne({ name: 'e_shop' });
+      const {
+        option: {
+          min_gold = 50e6,
+          min_rgold = 5,
+          max_gold = 600e6,
+          max_rgold = 40,
+        },
+        isEnable,
+      } = e_shop;
+      if (!isEnable) throw new Error('Chức năng nạp/rút tạm đóng!');
       const { data, typeUpdate, id, realAmount } = payload;
       const target_s = await this.serviceModel.findById(id);
       if (!target_s) throw new Error('Không tìm thấy Giao Dịch');
       this.logger.log(`Update Service: ${id} - Status: ${typeUpdate}`);
       const { type, amount, uid } = target_s.toObject();
+      // Check min & max;
+      if (['0', '2'].includes(type)) {
+        if (amount < min_rgold)
+          throw new Error(
+            `Bạn không thể giao dịch thấp hơn ${min_rgold} thỏi vàng`,
+          );
+        if (amount > max_rgold)
+          throw new Error(
+            `Bạn không thể giao dịch cao hơn ${max_rgold} thỏi vàng`,
+          );
+      } else {
+        if (amount < min_gold)
+          throw new Error(
+            `Bạn không thể giao dịch thấp hơn ${new Intl.NumberFormat('vi').format(min_gold)} vàng`,
+          );
+        if (amount > max_gold)
+          throw new Error(
+            `Bạn không thể giao dịch cao hơn ${new Intl.NumberFormat('vi').format(max_gold)} vàng`,
+          );
+      }
       let service = target_s.toObject();
       switch (typeUpdate) {
         case '0':
@@ -84,7 +118,7 @@ export class ServiceService {
           await this.serviceModel.findByIdAndUpdate(id, {
             ...data,
             $inc: {
-              revice: ['0', '1'].includes(type)
+              revice: ['2', '3'].includes(type)
                 ? realAmount.money_trade
                 : realAmount.money_receive,
             },
@@ -99,7 +133,7 @@ export class ServiceService {
           service = {
             ...service,
             ...data,
-            revice: ['0', '1'].includes(type)
+            revice: ['2', '3'].includes(type)
               ? realAmount.money_trade
               : realAmount.money_receive,
           };
