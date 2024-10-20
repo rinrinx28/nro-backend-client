@@ -205,6 +205,7 @@ export class MiddleEventService {
             if (clan < 0) clans.push({ clanId, score: revice });
             clans[clan].score += revice;
           }
+          user.markModified('meta');
           await user.save();
           notices.push(
             `Chức mừng người chơi ${user.name} đã cược thắng ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${w.place}`,
@@ -581,6 +582,7 @@ export class MiddleEventService {
             if (clan < 0) clans.push({ clanId, score: revice });
             clans[clan].score += revice;
           }
+          user.markModified('meta');
           await user.save();
           notices.push(
             `Chức mừng người chơi ${user.name} đã cược thắng ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${w.place}`,
