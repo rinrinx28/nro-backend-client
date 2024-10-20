@@ -10,9 +10,6 @@ export type SessionDocument = HydratedDocument<Session>;
 })
 export class Session {
   @Prop({ type: String, required: true })
-  uuid: string;
-
-  @Prop({ type: String, required: true })
   server: string;
 
   @Prop({ type: String, required: true })

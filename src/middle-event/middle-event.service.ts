@@ -337,7 +337,6 @@ export class MiddleEventService {
 
         // Lấy phiên mới nhất từ cơ sở dữ liệu dựa vào uuid
         const latestSession = await this.SessionModel.findOne({
-          uuid: data.uuid,
           server: data.server,
         }).sort({ receivedAt: -1 });
 
@@ -353,7 +352,6 @@ export class MiddleEventService {
             const newSession = await this.SessionModel.findByIdAndUpdate(
               latestSession.id,
               {
-                uuid: data.uuid,
                 server: data.server,
                 content: data.content,
                 result,
@@ -362,7 +360,7 @@ export class MiddleEventService {
                 receivedAt: new Date(),
               },
               { new: true, upsert: true },
-            );
+            ).exec();
             console.log('New session saved:', newSession);
           } else {
             console.log('Data is not valid, skipping...');
@@ -371,7 +369,6 @@ export class MiddleEventService {
           console.log('No previous session found, saving new session.');
 
           const newSession = await this.SessionModel.create({
-            uuid: data.uuid,
             server: data.server,
             content: data.content,
             result,
