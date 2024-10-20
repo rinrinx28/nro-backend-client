@@ -316,11 +316,14 @@ export class MiddleEventService {
       const match = content.match(regex);
 
       if (match) {
-        const result = parseInt(match[1], 10);
-        const numbers = match[2].split(',').map((num) => num.trim()); // Lấy dãy số sau ký tự \b
-        const remainingTime = parseInt(match[3], 10);
+        const result = parseInt(match[1], 10); // Kết quả giải trước
+        const remainingTime = parseInt(match[4], 10); // Thời gian còn lại
 
-        return { result, numbers, remainingTime };
+        // Tách giá trị cuối cùng trước dấu \b
+        const lastValueWithB = match[3]; // Giá trị trước dấu \b
+        const lastValue_split = lastValueWithB.split('\b')[0].split(','); // Tách ra để lấy giá trị
+        const lastValue = lastValue_split[lastValue_split.length - 1];
+        return { result, numbers: [lastValue], remainingTime };
       }
 
       return null;
@@ -331,9 +334,7 @@ export class MiddleEventService {
 
   async processData(data: IData) {
     try {
-      const parsedContent = this.parseContent(
-        data.content.replace('\b', '\\b'),
-      );
+      const parsedContent = this.parseContent(data.content);
 
       if (parsedContent) {
         const { result, numbers, remainingTime } = parsedContent;
