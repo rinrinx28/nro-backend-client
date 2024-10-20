@@ -14,6 +14,7 @@ import { Message } from 'src/user/schema/message.schema';
 import { Bot } from 'src/bot/schema/bot.schema';
 import { Clan } from './schema/clan.schema';
 import { Session } from './schema/ISession.schema';
+import { Mutex } from 'async-mutex';
 
 interface IData {
   uuid: string;
@@ -47,6 +48,7 @@ export class MiddleEventService {
     private readonly SessionModel: Model<Session>,
   ) {}
   private logger: Logger = new Logger('Middle Handler');
+  private readonly mutexMap = new Map<string, Mutex>();
 
   @OnEvent('bot.status', { async: true })
   async handleBotStatus(payload: BotStatuEvent) {
@@ -337,6 +339,15 @@ export class MiddleEventService {
   }
 
   async processData(data: IData) {
+    const parameter = `${data.server}.mini.info`; // Value will be lock
+
+    // Create mutex if it not exist
+    if (!this.mutexMap.has(parameter)) {
+      this.mutexMap.set(parameter, new Mutex());
+    }
+
+    const mutex = this.mutexMap.get(parameter);
+    const release = await mutex.acquire();
     try {
       const parsedContent = this.parseContent(data.content);
 
@@ -408,6 +419,10 @@ export class MiddleEventService {
       }
     } catch (err: any) {
       console.log(err);
+    } finally {
+      release();
+      // Giai phong map;
+      this.mutexMap.delete(parameter);
     }
   }
   // Hàm ghi log dữ liệu trễ
