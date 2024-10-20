@@ -416,7 +416,6 @@ export class MiddleEventService {
               console.log(
                 `Valid data, continuing the session. ${remainingTime} - ${result} - ${numbers.join('-')}`,
               );
-              return;
             } else {
               console.log('saving new session.');
 
@@ -433,6 +432,21 @@ export class MiddleEventService {
                 `New session saved: SID: ${newSession.id} - Result: ${newSession.result} - RemainingTime: ${newSession.remainingTime} - Old: ${newSession.numbers.join('-')}`,
               );
             }
+          } else {
+            console.log('saving new session.');
+
+            const newSession = await this.SessionModel.create({
+              server: data.server,
+              content: data.content,
+              result,
+              numbers,
+              remainingTime,
+              receivedAt: new Date(),
+              isEnd: false,
+            });
+            console.log(
+              `New session saved: SID: ${newSession.id} - Result: ${newSession.result} - RemainingTime: ${newSession.remainingTime} - Old: ${newSession.numbers.join('-')}`,
+            );
           }
         }
       } else {
