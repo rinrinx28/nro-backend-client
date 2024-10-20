@@ -420,7 +420,7 @@ export class MiddleEventService {
               server: data.server,
               isEnd: true,
             })
-            .sort({ receivedAt: -1 });
+            .sort({ updatedAt: -1 });
           if (oldSession) {
             // Kiểm tra nếu remainingTime là 0
             if (remainingTime === 0) {
