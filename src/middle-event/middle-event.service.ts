@@ -446,7 +446,16 @@ export class MiddleEventService {
                   timeEnd: this.addSeconds(new Date(), remainingTime),
                 });
               } else {
-                this.logger.log('Err Minigame Client: Data not match ...');
+                // Let create new
+                await this.CreateNewMiniGame({
+                  server: data.server,
+                  uuid: data.uuid,
+                  lastResult: numbers.join('-'),
+                  timeEnd: this.addSeconds(new Date(), remainingTime),
+                });
+                this.logger.log(
+                  'Minigame Client: Data not match ... create new',
+                );
               }
             }
           } else {
