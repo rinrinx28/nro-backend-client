@@ -62,9 +62,7 @@ export class MiddleEventService {
 
   @OnEvent('notice.info', { async: true })
   async handleNoticeInfo(payload: NoticeInfoEvent) {
-    if (payload.server === '5') {
-      await this.processData(payload);
-    }
+    await this.processData(payload);
   }
 
   @OnEvent('mini.bet.info', { async: true })
@@ -331,7 +329,7 @@ export class MiddleEventService {
         // Kết hợp mảng số thành chuỗi
         const numbersString = numbers.join('-');
 
-        return { result, numbers: [numbers[0]], numbersString, remainingTime };
+        return { result, numbers: numbers, numbersString, remainingTime };
       }
 
       return null;
@@ -375,7 +373,9 @@ export class MiddleEventService {
               },
               { new: true, upsert: true },
             ).exec();
-            console.log('Session ended:', updatedSession);
+            console.log(
+              `Session ended: SID: ${updatedSession.id} - Result: ${updatedSession.result} - RemainingTime: ${updatedSession.remainingTime} - Old: ${updatedSession.numbers.join('-')}`,
+            );
           } else {
             // So sánh với phiên mới nhất
             if (
@@ -397,7 +397,9 @@ export class MiddleEventService {
                 },
                 { new: true, upsert: true },
               ).exec();
-              console.log('Session updated:', newSession);
+              console.log(
+                `New session saved: SID: ${newSession.id} - Result: ${newSession.result} - RemainingTime: ${newSession.remainingTime} - Old: ${newSession.numbers.join('-')}`,
+              );
             } else {
               console.log('Data is not valid, skipping...');
             }
@@ -412,7 +414,7 @@ export class MiddleEventService {
             if (remainingTime === 0) {
               // Đánh dấu phiên hiện tại là đã kết thúc
               console.log(
-                `Valid data, continuing the session. ${remainingTime}`,
+                `Valid data, continuing the session. ${remainingTime} - ${result} - ${numbers.join('-')}`,
               );
               return;
             } else {
@@ -427,7 +429,9 @@ export class MiddleEventService {
                 receivedAt: new Date(),
                 isEnd: false,
               });
-              console.log('New session saved:', newSession);
+              console.log(
+                `New session saved: SID: ${newSession.id} - Result: ${newSession.result} - RemainingTime: ${newSession.remainingTime} - Old: ${newSession.numbers.join('-')}`,
+              );
             }
           }
         }
