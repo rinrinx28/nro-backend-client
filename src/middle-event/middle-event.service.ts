@@ -85,7 +85,7 @@ export class MiddleEventService {
     try {
       // let check old mini game;
       let old_game = await this.miniGameModel
-        .findOne({ isEnd: false })
+        .findOne({ isEnd: false, server: '24' })
         .sort({ updatedAt: -1 });
       // Fisrt time run system or out range time end!
       if (!old_game) {
