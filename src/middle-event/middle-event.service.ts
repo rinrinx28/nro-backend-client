@@ -353,7 +353,7 @@ export class MiddleEventService {
                 isEnd: true, // Đánh dấu phiên là đã kết thúc
                 receivedAt: new Date(),
               },
-              { new: true },
+              { new: true, upsert: true },
             ).exec();
             console.log('Session ended:', updatedSession);
           } else {
@@ -375,7 +375,7 @@ export class MiddleEventService {
                   receivedAt: new Date(),
                   isEnd: remainingTime === 0,
                 },
-                { new: true },
+                { new: true, upsert: true },
               ).exec();
               console.log('Session updated:', newSession);
             } else {
