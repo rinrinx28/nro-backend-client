@@ -411,52 +411,30 @@ export class MiddleEventService {
             // Kiểm tra nếu remainingTime là 0
             if (remainingTime === 0) {
               // Đánh dấu phiên hiện tại là đã kết thúc
-              console.log('Valid data, continuing the session.');
+              console.log(
+                `Valid data, continuing the session. ${remainingTime}`,
+              );
               return;
             } else {
-              // So sánh với phiên mới nhất
-              if (
-                oldSession.result === result ||
-                oldSession.numbers.includes(oldSession.result.toString())
-              ) {
-                console.log('Valid data, continuing the session.');
+              console.log('saving new session.');
 
-                // Lưu phiên mới vào cơ sở dữ liệu
-                const newSession = await this.SessionModel.findByIdAndUpdate(
-                  oldSession.id,
-                  {
-                    content: data.content,
-                    result,
-                    numbers,
-                    remainingTime,
-                    receivedAt: new Date(),
-                    isEnd: remainingTime === 0,
-                  },
-                  { new: true, upsert: true },
-                ).exec();
-                console.log('Session updated:', newSession);
-              } else {
-                console.log('Data is not valid, skipping...');
-              }
+              const newSession = await this.SessionModel.create({
+                server: data.server,
+                content: data.content,
+                result,
+                numbers,
+                remainingTime,
+                receivedAt: new Date(),
+                isEnd: false,
+              });
+              console.log('New session saved:', newSession);
             }
-          } else {
-            console.log('No previous session found, saving new session.');
-
-            const newSession = await this.SessionModel.create({
-              server: data.server,
-              content: data.content,
-              result,
-              numbers,
-              remainingTime,
-              receivedAt: new Date(),
-              isEnd: remainingTime === 0,
-            });
-            console.log('New session saved:', newSession);
           }
         }
       } else {
         console.log('Failed to parse content:', data.content);
       }
+      return;
     } catch (err: any) {
       console.log(err);
     } finally {
