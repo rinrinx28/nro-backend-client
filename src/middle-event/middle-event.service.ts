@@ -69,7 +69,7 @@ export class MiddleEventService {
   async handlerMiniInfo(server: string) {
     try {
       const n_game = await this.miniGameModel
-        .findOne({ server: server, isEnd: false })
+        .findOne({ server: server })
         .sort({ updatedAt: -1 });
       if (n_game) {
         this.socketGateway.server.emit('mini.bet', {
