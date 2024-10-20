@@ -60,9 +60,9 @@ export class MiddleEventService {
 
   @OnEvent('notice.info', { async: true })
   async handleNoticeInfo(payload: NoticeInfoEvent) {
-    if (payload.server === '6') {
-      await this.miniGameClient(payload);
-    }
+    // if (payload.server === '6') {
+    // }
+    await this.miniGameClient(payload);
   }
 
   @OnEvent('mini.bet.info', { async: true })
@@ -430,7 +430,7 @@ export class MiddleEventService {
               );
             } else {
               // Check is next game
-              this.logger.log(numbers, oldSession.lastResult.split('-'));
+              // this.logger.log(numbers, oldSession.lastResult.split('-'));
               if (numbers[1] === oldSession.lastResult.split('-')[0]) {
                 // Let save update old data and Send Prizes
                 oldSession.result = numbers[0];
