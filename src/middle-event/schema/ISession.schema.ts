@@ -27,6 +27,9 @@ export class Session {
   @Prop({ type: SchemaTypes.Date })
   receivedAt: Date; // Thời gian nhận dữ liệu
 
+  @Prop({ default: false })
+  isEnd: boolean;
+
   updatedAt?: Date;
   createdAt?: Date;
 }
