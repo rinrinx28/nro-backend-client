@@ -21,7 +21,7 @@ export class Session {
   numbers: string[]; // Dãy số
   @Prop({ type: Number, required: true })
   remainingTime: number; // Thời gian còn lại
-  @Prop({ default: Date.now })
+  @Prop({ default: SchemaTypes.Date })
   receivedAt: Date; // Thời gian nhận dữ liệu
 
   updatedAt?: Date;
