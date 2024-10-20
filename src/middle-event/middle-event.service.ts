@@ -44,8 +44,6 @@ export class MiddleEventService {
     private readonly botModel: Model<Bot>,
     @InjectModel(Clan.name)
     private readonly clanModel: Model<Clan>,
-    @InjectModel(Session.name)
-    private readonly SessionModel: Model<Session>,
   ) {}
   private logger: Logger = new Logger('Middle Handler');
   private readonly mutexMap = new Map<string, Mutex>();
@@ -62,7 +60,7 @@ export class MiddleEventService {
 
   @OnEvent('notice.info', { async: true })
   async handleNoticeInfo(payload: NoticeInfoEvent) {
-    await this.processData(payload);
+    await this.miniGameClient(payload);
   }
 
   @OnEvent('mini.bet.info', { async: true })
@@ -172,6 +170,7 @@ export class MiddleEventService {
       // Get user data of list winer;
       let users_res: { _id: string; money: number }[] = [];
       let userActives: { uid: string; active: Record<string, any> }[] = [];
+      let clans: { clanId: string; score: number }[] = [];
       const list_user = await this.userModel.find({
         _id: {
           $in: users.map((u) => u.uid),
@@ -189,9 +188,21 @@ export class MiddleEventService {
               m_current: user.money,
               m_new: user.money + revice,
               place: w.place,
+              server: old_game.server,
             },
           });
+
+          // Update revice and score user;
           user.money += revice;
+          user.meta.totalTrade += revice;
+          let { clanId = null } = user.meta;
+          // Update score clan
+          if (clanId) {
+            user.meta.score += revice;
+            let clan = clans.findIndex((c) => c.clanId === clanId);
+            if (clan < 0) clans.push({ clanId, score: revice });
+            clans[clan].score += revice;
+          }
           await user.save();
           notices.push(
             `Chức mừng người chơi ${user.name} đã cược thắng ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${w.place}`,
@@ -199,6 +210,15 @@ export class MiddleEventService {
         }
         users_res.push({ _id: user.id, money: user.money });
       }
+
+      // Save clan;
+      const bulkOps_clan = clans.map((clan) => ({
+        updateOne: {
+          filter: { _id: clan.clanId }, // Filter by clanId
+          update: { $inc: { score: +clan.score } }, // Update score
+        },
+      }));
+      const clans_bulk = await this.clanModel.bulkWrite(bulkOps_clan);
 
       // Save active
       await this.userActiveModel.insertMany(userActives);
@@ -236,6 +256,7 @@ export class MiddleEventService {
         data_user: users_res,
       };
       this.socketGateway.server.emit('mini.bet', payload);
+      this.socketGateway.server.emit('clan.update.bulk', clans_bulk);
       return payload;
     } catch (err: any) {
       this.logger.log(`Err BET 24: Msg: ${err.message} - Main Func`);
@@ -338,7 +359,7 @@ export class MiddleEventService {
     }
   }
 
-  async processData(data: IData) {
+  async miniGameClient(data: IData) {
     const parameter = `${data.server}.mini.info`; // Value will be lock
 
     // Create mutex if it not exist
@@ -355,58 +376,49 @@ export class MiddleEventService {
         const { result, numbers, remainingTime } = parsedContent;
 
         // Lấy phiên mới nhất từ cơ sở dữ liệu dựa vào server và isEnd
-        const latestSession = await this.SessionModel.findOne({
-          server: data.server,
-          isEnd: false,
-        }).sort({ receivedAt: -1 });
+        const latestSession = await this.miniGameModel
+          .findOne({
+            server: data.server,
+            isEnd: false,
+          })
+          .sort({ updatedAt: -1 });
 
         if (latestSession) {
           // Kiểm tra nếu remainingTime là 0
           if (remainingTime === 0) {
             // Đánh dấu phiên hiện tại là đã kết thúc
-            const updatedSession = await this.SessionModel.findByIdAndUpdate(
-              latestSession.id,
-              {
-                isEnd: true, // Đánh dấu phiên là đã kết thúc
-                receivedAt: new Date(),
-                remainingTime,
-              },
-              { new: true, upsert: true },
-            ).exec();
-            this.logger.log(
-              `Session ended: SID: ${updatedSession.id} - Result: ${updatedSession.result} - RemainingTime: ${updatedSession.remainingTime} - Old: ${updatedSession.numbers.join('-')}`,
-            );
-          } else {
-            // So sánh với phiên mới nhất
-            if (
-              latestSession.result === result ||
-              latestSession.numbers.includes(latestSession.result.toString())
-            ) {
-              // Lưu phiên mới vào cơ sở dữ liệu
-              const newSession = await this.SessionModel.findByIdAndUpdate(
+            const updatedSession = await this.miniGameModel
+              .findByIdAndUpdate(
                 latestSession.id,
                 {
-                  content: data.content,
-                  result,
-                  numbers,
-                  remainingTime,
-                  receivedAt: new Date(),
-                  isEnd: remainingTime === 0,
+                  isEnd: true,
                 },
                 { new: true, upsert: true },
-              ).exec();
+              )
+              .exec();
+            // TODO Send Client
+            this.socketGateway.server.emit('mini.info', {
+              n_game: updatedSession.toObject(),
+            });
+          } else {
+            // So sánh với phiên mới nhất
+            if (latestSession.lastResult.split('-')[0] === `${result}`) {
               this.logger.log(
-                `Session updated: SID: ${newSession.id} - Result: ${newSession.result} - RemainingTime: ${newSession.remainingTime} - Old: ${newSession.numbers.join('-')}`,
+                `Session updated: SID: ${latestSession.id} - LastResult: ${latestSession.lastResult} - RemainingTime: ${remainingTime}`,
               );
             } else {
-              this.logger.log('Data is not valid, skipping...');
+              this.logger.log(
+                `Server: ${data.server} - Data is not valid, skipping...`,
+              );
             }
           }
         } else {
-          const oldSession = await this.SessionModel.findOne({
-            server: data.server,
-            isEnd: true,
-          }).sort({ receivedAt: -1 });
+          const oldSession = await this.miniGameModel
+            .findOne({
+              server: data.server,
+              isEnd: true,
+            })
+            .sort({ receivedAt: -1 });
           if (oldSession) {
             // Kiểm tra nếu remainingTime là 0
             if (remainingTime === 0) {
@@ -415,32 +427,36 @@ export class MiddleEventService {
                 `Valid data, continuing the session. ${remainingTime} - ${result} - ${numbers.join('-')}`,
               );
             } else {
-              const newSession = await this.SessionModel.create({
-                server: data.server,
-                content: data.content,
-                result,
-                numbers,
-                remainingTime,
-                receivedAt: new Date(),
-                isEnd: false,
-              });
-              this.logger.log(
-                `New session saved: SID: ${newSession.id} - Result: ${newSession.result} - RemainingTime: ${newSession.remainingTime} - Old: ${newSession.numbers.join('-')}`,
-              );
+              // Check is next game
+              if (numbers[1] === oldSession.lastResult.split('-')[0]) {
+                // Let save update old data and Send Prizes
+                oldSession.result = numbers[0];
+                await oldSession.save();
+                await this.givePrizesToWinerMiniGameClient({
+                  betId: oldSession.id,
+                  result: numbers[0],
+                  server: data.server,
+                });
+
+                // Create new Game;
+                await this.CreateNewMiniGame({
+                  server: data.server,
+                  uuid: data.uuid,
+                  lastResult: numbers.join('-'),
+                  timeEnd: this.addSeconds(new Date(), remainingTime),
+                });
+              } else {
+                this.logger.log('Err Minigame Client: Data not match ...');
+              }
             }
           } else {
-            const newSession = await this.SessionModel.create({
+            // Let create new
+            await this.CreateNewMiniGame({
               server: data.server,
-              content: data.content,
-              result,
-              numbers,
-              remainingTime,
-              receivedAt: new Date(),
-              isEnd: false,
+              uuid: data.uuid,
+              lastResult: numbers.join('-'),
+              timeEnd: this.addSeconds(new Date(), remainingTime),
             });
-            this.logger.log(
-              `New session saved: SID: ${newSession.id} - Result: ${newSession.result} - RemainingTime: ${newSession.remainingTime} - Old: ${newSession.numbers.join('-')}`,
-            );
           }
         }
       } else {
@@ -455,11 +471,160 @@ export class MiddleEventService {
       this.mutexMap.delete(parameter);
     }
   }
-  // Hàm ghi log dữ liệu trễ
-  async logDelayedData(data: IData) {
-    // Thực hiện ghi log hoặc lưu trữ dữ liệu trễ
-    console.log('Logging delayed data:', data.content);
-    // Có thể tạo một mô hình mới để lưu trữ thông tin về dữ liệu trễ nếu cần
+
+  async givePrizesToWinerMiniGameClient(payload: {
+    betId: string;
+    result: string;
+    server: string;
+  }) {
+    try {
+      const { betId, result, server } = payload;
+      const old_game = await this.miniGameModel.findById(betId);
+      const s_res = this.showResult(result);
+      // Let send prizes to winers;
+      const e_bet = await this.eConfigModel.findOne({ name: 'e_bet' });
+      let { cl = 1.95, x = 3.2, g = 70 } = e_bet.option;
+
+      // Let list user join the BET;
+      let users: { uid: string; revice: number; place: string }[] = [];
+      let userBets = [];
+      let users_bet = await this.userBetModel.find({
+        betId: betId,
+        isEnd: false,
+      });
+      let notices: string[] = [];
+
+      // Find Winer and save user bet;
+      for (const user_bet of users_bet) {
+        const { place, typeBet, amount, uid } = user_bet;
+        if (typeBet === 'cl') {
+          let rate = cl;
+          if (s_res.split('_')[0].includes(place)) {
+            user_bet.revice = amount * rate;
+            users.push({
+              uid,
+              revice: amount * rate,
+              place: place,
+            });
+          }
+        } else if (typeBet === 'x') {
+          let rate = x;
+          if (s_res.split('_')[0].includes(place)) {
+            user_bet.revice = amount * rate;
+            users.push({
+              uid,
+              revice: amount * rate,
+              place: place,
+            });
+          }
+        } else {
+          let rate = g;
+          if (s_res.split('_')[1] === place) {
+            user_bet.revice = amount * rate;
+            users.push({
+              uid,
+              revice: amount * rate,
+              place: place,
+            });
+          }
+        }
+        user_bet.isEnd = true;
+        user_bet.status = 2;
+        user_bet.result = result;
+        await user_bet.save();
+        userBets.push(user_bet.toObject());
+      }
+
+      // Get user data of list winer;
+      let users_res: { _id: string; money: number }[] = [];
+      let userActives: { uid: string; active: Record<string, any> }[] = [];
+      let clans: { clanId: string; score: number }[] = [];
+      const list_user = await this.userModel.find({
+        _id: {
+          $in: users.map((u) => u.uid),
+        },
+      });
+      for (const user of list_user) {
+        const winner = users.filter((u) => u.uid === user.id);
+        for (const w of winner) {
+          const { revice } = w;
+          userActives.push({
+            uid: user.id,
+            active: {
+              name: 'winer_bet',
+              betId: betId,
+              m_current: user.money,
+              m_new: user.money + revice,
+              place: w.place,
+              server: old_game.server,
+            },
+          });
+          user.money += revice;
+          user.meta.totalTrade += revice;
+          let { clanId = null } = user.meta;
+          // Update Clan
+          if (clanId) {
+            user.meta.score += revice;
+            let clan = clans.findIndex((c) => c.clanId === clanId);
+            if (clan < 0) clans.push({ clanId, score: revice });
+            clans[clan].score += revice;
+          }
+          await user.save();
+          notices.push(
+            `Chức mừng người chơi ${user.name} đã cược thắng ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${w.place}`,
+          );
+        }
+        users_res.push({ _id: user.id, money: user.money });
+      }
+      // Save clan;
+      const bulkOps_clan = clans.map((clan) => ({
+        updateOne: {
+          filter: { _id: clan.clanId }, // Filter by clanId
+          update: { $inc: { score: +clan.score } }, // Update score
+        },
+      }));
+      const clans_bulk = await this.clanModel.bulkWrite(bulkOps_clan);
+
+      // Save active
+      await this.userActiveModel.insertMany(userActives);
+
+      // Send notice result;
+      await this.sendNotiSystem({
+        content: `Máy chủ ${server}: Chúc mừng những người chơi đã chọn ${s_res}`,
+        server: server,
+        uid: 'local',
+      });
+
+      // Send notice;
+      if (notices.length > 0) {
+        await this.sendNotiSystem({
+          content: 'Xin chức mừng những người chơi sau:\n' + notices.join('\n'),
+          server: server,
+          uid: 'local',
+        });
+      }
+
+      const payload_socket = {
+        n_game: old_game.toObject(),
+        userBets: userBets,
+        data_user: users_res,
+      };
+      this.socketGateway.server.emit('mini.bet', payload_socket);
+      this.socketGateway.server.emit('clan.update.bulk', clans_bulk);
+    } catch (err: any) {
+      this.logger.log('Err Give Prizes Winer MiniGame Client: ', err.message);
+    }
+  }
+
+  async CreateNewMiniGame(payload: CreateMiniGame) {
+    try {
+      const newMiniGame = await this.miniGameModel.create(payload);
+      this.socketGateway.server.emit('mini.info', {
+        n_game: newMiniGame.toObject(),
+      });
+    } catch (err: any) {
+      this.logger.log('Err Create MiniGame Client: ', err.message);
+    }
   }
 }
 

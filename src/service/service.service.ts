@@ -156,156 +156,157 @@ export class ServiceService {
 
     if (typeUpdate === '1') {
       // Refund money to User;
-      switch (type) {
-        // Rut Thoi Vang (rgold)
-        case '0':
-          let refund_money_rgold = amount * 1e6 * 37;
-          // Refund Money to user with rate 1e6*37
-          await this.userModel.findByIdAndUpdate(uid, {
-            $inc: {
-              money: +refund_money_rgold,
-            },
-          });
+      if (type === '0') {
+        let refund_money_rgold = amount * 1e6 * 37;
+        // Refund Money to user with rate 1e6*37
+        let user_rgold = await this.userModel.findByIdAndUpdate(uid, {
+          $inc: {
+            money: +refund_money_rgold,
+            'meta.limitTrade': +refund_money_rgold,
+            'meta.trade': -refund_money_rgold,
+          },
+        });
 
-          // save active
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'service withdraw rgold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money + refund_money_rgold,
-            },
-          });
-          this.socketGateway.server.emit('user.update', {
-            ...user,
-            money: money + refund_money_rgold,
-          });
-          return;
-        // Rut Vang (gold)
-        case '1':
-          // Refund Money to user with rate 1e6*37
-          await this.userModel.findByIdAndUpdate(uid, {
-            $inc: {
-              money: +amount,
-            },
-          });
+        let { pwd_h, ...res_u } = user_rgold;
 
-          // save active
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'service withdraw gold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money + amount,
-            },
-          });
-          this.socketGateway.server.emit('user.update', {
-            ...user,
-            money: money + amount,
-          });
-          return;
-        // Nap thoi vang
-        case '2':
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'service deposit rgold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money,
-            },
-          });
-          return;
-        // Nap vang
-        default:
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'service deposit gold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money,
-            },
-          });
-          return;
+        // save active
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'service withdraw rgold',
+            status: typeUpdate,
+            m_current: res_u.money - refund_money_rgold,
+            m_new: res_u.money,
+          },
+        });
+        this.socketGateway.server.emit('user.update', {
+          ...res_u,
+        });
+        return;
+      } else if (type === '1') {
+        // Refund Money to user with rate 1e6*37
+        let user_gold = await this.userModel.findByIdAndUpdate(uid, {
+          $inc: {
+            money: +amount,
+            'meta.limitTrade': +amount,
+            'meta.trade': -amount,
+          },
+        });
+        let { pwd_h, ...res_u } = user_gold;
+
+        // save active
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'service withdraw gold',
+            status: typeUpdate,
+            m_current: res_u.money - amount,
+            m_new: res_u.money,
+          },
+        });
+        this.socketGateway.server.emit('user.update', {
+          ...res_u,
+        });
+        return;
+      } else if (type === '2') {
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'service deposit rgold',
+            status: typeUpdate,
+            m_current: money,
+            m_new: money,
+          },
+        });
+        return;
+      } else {
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'service deposit gold',
+            status: typeUpdate,
+            m_current: money,
+            m_new: money,
+          },
+        });
+        return;
       }
     }
 
     if (typeUpdate === '2') {
-      switch (type) {
-        // Rut Thoi Vang (rgold)
-        case '0':
-          // save active
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'service withdraw rgold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money,
-            },
-          });
-          return;
-        // Rut Vang (gold)
-        case '1':
-          // save active
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'service withdraw gold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money,
-            },
-          });
-          return;
-        // Nap thoi vang
-        case '2':
-          let deposit_rgold = realAmount.money_receive * 1e6 * 37;
-          await this.userModel.findByIdAndUpdate(uid, {
-            $inc: {
-              money: +deposit_rgold,
-            },
-          });
+      // Refund money to User;
+      if (type === '0') {
+        // save active
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'service withdraw rgold',
+            status: typeUpdate,
+            m_current: money,
+            m_new: money,
+          },
+        });
+        return;
+      } else if (type === '1') {
+        // save active
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'service withdraw gold',
+            status: typeUpdate,
+            m_current: money,
+            m_new: money,
+          },
+        });
+        return;
+      } else if (type === '2') {
+        let deposit_rgold = realAmount.money_receive * 1e6 * 37;
+        let user_rgold = await this.userModel.findByIdAndUpdate(uid, {
+          $inc: {
+            money: +deposit_rgold,
+            'meta.deposit': +deposit_rgold,
+            'meta.totalScore': +deposit_rgold,
+          },
+        });
 
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'service deposit rgold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money + deposit_rgold,
-            },
-          });
-          this.socketGateway.server.emit('user.update', {
-            ...user,
-            money: money + deposit_rgold,
-          });
-          return;
-        // Nap vang
-        default:
-          await this.userModel.findByIdAndUpdate(uid, {
-            $inc: {
-              money: +realAmount.money_receive,
-            },
-          });
+        let { pwd_h, ...res_u } = user_rgold;
 
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'service deposit gold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money + realAmount.money_receive,
-            },
-          });
-          this.socketGateway.server.emit('user.update', {
-            ...user,
-            money: money + realAmount.money_receive,
-          });
-          return;
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'service deposit rgold',
+            status: typeUpdate,
+            m_current: res_u.money - deposit_rgold,
+            m_new: res_u.money,
+          },
+        });
+        this.socketGateway.server.emit('user.update', {
+          ...res_u,
+        });
+        return;
+      } else {
+        let user_gold = await this.userModel.findByIdAndUpdate(uid, {
+          $inc: {
+            money: +realAmount.money_receive,
+            'meta.deposit': +realAmount.money_receive,
+            'meta.totalScore': +realAmount.money_receive,
+          },
+        });
+        let { pwd_h, ...res_u } = user_gold;
+
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'service deposit gold',
+            status: typeUpdate,
+            m_current: res_u.money - realAmount.money_receive,
+            m_new: res_u.money,
+          },
+        });
+        this.socketGateway.server.emit('user.update', {
+          ...res_u,
+        });
+        return;
       }
     }
   }
