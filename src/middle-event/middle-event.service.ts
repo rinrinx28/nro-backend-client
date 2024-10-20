@@ -62,7 +62,9 @@ export class MiddleEventService {
 
   @OnEvent('notice.info', { async: true })
   async handleNoticeInfo(payload: NoticeInfoEvent) {
-    await this.processData(payload);
+    if (payload.server === '5') {
+      await this.processData(payload);
+    }
   }
 
   @OnEvent('mini.bet.info', { async: true })
