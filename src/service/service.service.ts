@@ -173,7 +173,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'service withdraw rgold',
+            name: 'w_rgold',
             status: typeUpdate,
             m_current: res_u.money - refund_money_rgold,
             m_new: res_u.money,
@@ -198,7 +198,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'service withdraw gold',
+            name: 'w_gold',
             status: typeUpdate,
             m_current: res_u.money - amount,
             m_new: res_u.money,
@@ -212,7 +212,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'service deposit rgold',
+            name: 'd_rgold',
             status: typeUpdate,
             m_current: money,
             m_new: money,
@@ -223,7 +223,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'service deposit gold',
+            name: 'd_gold',
             status: typeUpdate,
             m_current: money,
             m_new: money,
@@ -240,7 +240,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'service withdraw rgold',
+            name: 'w_rgold',
             status: typeUpdate,
             m_current: money,
             m_new: money,
@@ -252,7 +252,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'service withdraw gold',
+            name: 'w_gold',
             status: typeUpdate,
             m_current: money,
             m_new: money,
@@ -274,7 +274,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'service deposit rgold',
+            name: 'd_rgold',
             status: typeUpdate,
             m_current: res_u.money - deposit_rgold,
             m_new: res_u.money,
@@ -297,7 +297,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'service deposit gold',
+            name: 'd_gold',
             status: typeUpdate,
             m_current: res_u.money - realAmount.money_receive,
             m_new: res_u.money,

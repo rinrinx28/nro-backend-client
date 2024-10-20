@@ -7,9 +7,8 @@ export type UserActiveDocument = HydratedDocument<UserActive>;
   timestamps: true,
 })
 export class UserActive {
-  // One-to-many relationship with the User model
   @Prop()
-  uid: Types.ObjectId;
+  uid: string;
 
   @Prop({ default: {}, type: SchemaTypes.Mixed })
   active: Record<string, any>;

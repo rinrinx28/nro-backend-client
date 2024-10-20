@@ -10,7 +10,7 @@ type TypeService = '0' | '1' | '2' | '3';
 })
 export class Service {
   @Prop()
-  uid: Types.ObjectId;
+  uid: string;
 
   @Prop()
   playerName: string;
