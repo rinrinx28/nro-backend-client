@@ -310,20 +310,17 @@ export class MiddleEventService {
   //TODO ———————————————[Handler notice info]———————————————
   parseContent(content: string) {
     try {
-      // Cập nhật biểu thức chính quy để bao gồm dấu \b
+      // Sử dụng biểu thức chính quy để lấy kết quả giải trước, dãy số và thời gian còn lại
       const regex =
-        /Kết quả giải trước: (\d+).*?(\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
+        /Kết quả giải trước: (\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
       const match = content.match(regex);
 
       if (match) {
-        const result = parseInt(match[1], 10); // Kết quả giải trước
-        const remainingTime = parseInt(match[4], 10); // Thời gian còn lại
+        const result = parseInt(match[1], 10);
+        const numbers = match[2].split(',').map((num) => num.trim()); // Lấy dãy số sau ký tự \b
+        const remainingTime = parseInt(match[3], 10);
 
-        // Tách giá trị cuối cùng trước dấu \b
-        const lastValueWithB = match[3]; // Giá trị trước dấu \b
-        const lastValue_split = lastValueWithB.split('\b')[0].split(','); // Tách ra để lấy giá trị
-        const lastValue = lastValue_split[lastValue_split.length - 1];
-        return { result, numbers: [lastValue], remainingTime };
+        return { result, numbers, remainingTime };
       }
 
       return null;
@@ -334,7 +331,9 @@ export class MiddleEventService {
 
   async processData(data: IData) {
     try {
-      const parsedContent = this.parseContent(data.content);
+      const parsedContent = this.parseContent(
+        data.content.replace('\b', '\\b'),
+      );
 
       if (parsedContent) {
         const { result, numbers, remainingTime } = parsedContent;
