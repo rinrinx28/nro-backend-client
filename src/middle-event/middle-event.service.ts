@@ -60,7 +60,7 @@ export class MiddleEventService {
 
   @OnEvent('notice.info', { async: true })
   async handleNoticeInfo(payload: NoticeInfoEvent) {
-    console.log(payload);
+    await this.processData(payload);
   }
 
   @OnEvent('mini.bet.info', { async: true })
@@ -309,41 +309,62 @@ export class MiddleEventService {
 
   //TODO ———————————————[Handler notice info]———————————————
   parseContent(content: string) {
-    const regex =
-      /Kết quả giải trước: (\d+).*?(\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
-    const match = content.match(regex);
+    try {
+      const regex =
+        /Kết quả giải trước: (\d+).*?(\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
+      const match = content.match(regex);
 
-    if (match) {
-      const result = parseInt(match[1], 10);
-      const numbers = match[2].split(',').map((num) => num.trim());
-      const remainingTime = parseInt(match[4], 10);
+      if (match) {
+        const result = parseInt(match[1], 10);
+        const numbers = match[2].split(',').map((num) => num.trim());
+        const remainingTime = parseInt(match[4], 10);
 
-      return { result, numbers, remainingTime };
+        return { result, numbers, remainingTime };
+      }
+
+      return null;
+    } catch (err: any) {
+      console.log(err);
     }
-
-    return null;
   }
 
   async processData(data: IData) {
-    const parsedContent = this.parseContent(data.content);
+    try {
+      const parsedContent = this.parseContent(data.content);
 
-    if (parsedContent) {
-      const { result, numbers, remainingTime } = parsedContent;
+      if (parsedContent) {
+        const { result, numbers, remainingTime } = parsedContent;
 
-      // Lấy phiên mới nhất từ cơ sở dữ liệu dựa vào uuid
-      const latestSession = await this.SessionModel.findOne({
-        uuid: data.uuid,
-      }).sort({ receivedAt: -1 });
+        // Lấy phiên mới nhất từ cơ sở dữ liệu dựa vào uuid
+        const latestSession = await this.SessionModel.findOne({
+          uuid: data.uuid,
+        }).sort({ receivedAt: -1 });
 
-      if (latestSession) {
-        // So sánh với phiên mới nhất
-        if (
-          latestSession.result === result ||
-          latestSession.numbers.includes(latestSession.result.toString())
-        ) {
-          console.log('Valid data, continuing the session.');
+        if (latestSession) {
+          // So sánh với phiên mới nhất
+          if (
+            latestSession.result === result ||
+            latestSession.numbers.includes(latestSession.result.toString())
+          ) {
+            console.log('Valid data, continuing the session.');
 
-          // Lưu phiên mới vào cơ sở dữ liệu
+            // Lưu phiên mới vào cơ sở dữ liệu
+            const newSession = await this.SessionModel.create({
+              uuid: data.uuid,
+              server: data.server,
+              content: data.content,
+              result,
+              numbers,
+              remainingTime,
+              receivedAt: new Date(),
+            });
+            console.log('New session saved:', newSession);
+          } else {
+            console.log('Data is not valid, skipping...');
+          }
+        } else {
+          console.log('No previous session found, saving new session.');
+
           const newSession = await this.SessionModel.create({
             uuid: data.uuid,
             server: data.server,
@@ -354,25 +375,12 @@ export class MiddleEventService {
             receivedAt: new Date(),
           });
           console.log('New session saved:', newSession);
-        } else {
-          console.log('Data is not valid, skipping...');
         }
       } else {
-        console.log('No previous session found, saving new session.');
-
-        const newSession = await this.SessionModel.create({
-          uuid: data.uuid,
-          server: data.server,
-          content: data.content,
-          result,
-          numbers,
-          remainingTime,
-          receivedAt: new Date(),
-        });
-        console.log('New session saved:', newSession);
+        console.log('Failed to parse content:', data.content);
       }
-    } else {
-      console.log('Failed to parse content:', data.content);
+    } catch (err: any) {
+      console.log(err);
     }
   }
 }
