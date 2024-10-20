@@ -373,7 +373,7 @@ export class MiddleEventService {
               },
               { new: true, upsert: true },
             ).exec();
-            console.log(
+            this.logger.log(
               `Session ended: SID: ${updatedSession.id} - Result: ${updatedSession.result} - RemainingTime: ${updatedSession.remainingTime} - Old: ${updatedSession.numbers.join('-')}`,
             );
           } else {
@@ -382,7 +382,7 @@ export class MiddleEventService {
               latestSession.result === result ||
               latestSession.numbers.includes(latestSession.result.toString())
             ) {
-              console.log('Valid data, continuing the session.');
+              this.logger.log('Valid data, continuing the session.');
 
               // Lưu phiên mới vào cơ sở dữ liệu
               const newSession = await this.SessionModel.findByIdAndUpdate(
@@ -397,11 +397,11 @@ export class MiddleEventService {
                 },
                 { new: true, upsert: true },
               ).exec();
-              console.log(
-                `New session saved: SID: ${newSession.id} - Result: ${newSession.result} - RemainingTime: ${newSession.remainingTime} - Old: ${newSession.numbers.join('-')}`,
+              this.logger.log(
+                `Session updated: SID: ${newSession.id} - Result: ${newSession.result} - RemainingTime: ${newSession.remainingTime} - Old: ${newSession.numbers.join('-')}`,
               );
             } else {
-              console.log('Data is not valid, skipping...');
+              this.logger.log('Data is not valid, skipping...');
             }
           }
         } else {
@@ -413,11 +413,11 @@ export class MiddleEventService {
             // Kiểm tra nếu remainingTime là 0
             if (remainingTime === 0) {
               // Đánh dấu phiên hiện tại là đã kết thúc
-              console.log(
+              this.logger.log(
                 `Valid data, continuing the session. ${remainingTime} - ${result} - ${numbers.join('-')}`,
               );
             } else {
-              console.log('saving new session.');
+              this.logger.log('saving new session.');
 
               const newSession = await this.SessionModel.create({
                 server: data.server,
@@ -428,12 +428,12 @@ export class MiddleEventService {
                 receivedAt: new Date(),
                 isEnd: false,
               });
-              console.log(
+              this.logger.log(
                 `New session saved: SID: ${newSession.id} - Result: ${newSession.result} - RemainingTime: ${newSession.remainingTime} - Old: ${newSession.numbers.join('-')}`,
               );
             }
           } else {
-            console.log('saving new session.');
+            this.logger.log('saving new session.');
 
             const newSession = await this.SessionModel.create({
               server: data.server,
@@ -444,17 +444,17 @@ export class MiddleEventService {
               receivedAt: new Date(),
               isEnd: false,
             });
-            console.log(
+            this.logger.log(
               `New session saved: SID: ${newSession.id} - Result: ${newSession.result} - RemainingTime: ${newSession.remainingTime} - Old: ${newSession.numbers.join('-')}`,
             );
           }
         }
       } else {
-        console.log('Failed to parse content:', data.content);
+        this.logger.log('Failed to parse content:', data.content);
       }
       return;
     } catch (err: any) {
-      console.log(err);
+      this.logger.log(err);
     } finally {
       release();
       // Giai phong map;
