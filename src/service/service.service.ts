@@ -80,8 +80,8 @@ export class ServiceService {
       this.logger.log(`Update Service: ${id} - Status: ${typeUpdate}`);
       const { type, amount, uid } = target_s.toObject();
       let revice = ['0', '1'].includes(type)
-        ? realAmount.money_trade
-        : realAmount.money_receive;
+        ? (realAmount.money_trade ?? 0)
+        : (realAmount.money_receive ?? 0);
 
       // Check min & max;
       if (['0', '2'].includes(type)) {
@@ -167,8 +167,8 @@ export class ServiceService {
     let { pwd_h, ...user } = target_u.toObject();
     let { money } = user;
     let revice = ['0', '1'].includes(type)
-      ? realAmount.money_trade
-      : realAmount.money_receive;
+      ? (realAmount.money_trade ?? 0)
+      : (realAmount.money_receive ?? 0);
 
     if (typeUpdate === '1') {
       // Refund money to User;
