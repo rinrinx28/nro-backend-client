@@ -387,7 +387,7 @@ export class MiddleEventService {
         const remainingTime = parseInt(match[3], 10);
 
         // Kết hợp mảng số thành chuỗi
-        const numbersString = numbers.join('-');
+        const numbersString = numbers.filter((n) => n.length > 0).join('-');
 
         return { result, numbers: numbers, numbersString, remainingTime };
       }
