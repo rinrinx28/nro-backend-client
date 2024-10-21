@@ -130,8 +130,8 @@ export class AppController {
             status: '1',
           },
           realAmount: {
-            money_trade: parseInt(money_trade, 10),
-            money_receive: parseInt(money_receive, 10),
+            money_trade: 0,
+            money_receive: 0,
           },
         });
       case '2':
