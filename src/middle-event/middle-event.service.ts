@@ -376,6 +376,7 @@ export class MiddleEventService {
       const regex =
         /Kết quả giải trước: (\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
       const match = content.match(regex);
+      console.log(content);
 
       if (match) {
         const result = parseInt(match[1], 10);
