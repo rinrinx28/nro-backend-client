@@ -79,7 +79,7 @@ export class ServiceService {
       if (!target_s) throw new Error('Không tìm thấy Giao Dịch');
       this.logger.log(`Update Service: ${id} - Status: ${typeUpdate}`);
       const { type, amount, uid } = target_s.toObject();
-      let revice = ['0', '1'].includes(type)
+      let revice = ['2', '3'].includes(type)
         ? (realAmount.money_receive ?? 0)
         : (realAmount.money_trade ?? 0);
 
@@ -166,7 +166,7 @@ export class ServiceService {
     const target_u = await this.userModel.findById(uid);
     let { pwd_h, ...user } = target_u.toObject();
     let { money } = user;
-    let revice = ['0', '1'].includes(type)
+    let revice = ['2', '3'].includes(type)
       ? (realAmount.money_receive ?? 0)
       : (realAmount.money_trade ?? 0);
 
