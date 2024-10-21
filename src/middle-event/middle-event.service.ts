@@ -55,7 +55,7 @@ export class MiddleEventService {
     { key: 'LX', name: 'Lẻ Xỉu' },
   ];
 
-  async show_result_text(res) {
+  show_result_text(res: string) {
     return this.KeyConfig.find((k) => k.key === res).name;
   }
 
