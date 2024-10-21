@@ -383,13 +383,14 @@ export class MiddleEventService {
           .split(',')
           .map((num) => num.trim())
           .map((s) => s.split('\b').filter((f) => f.length > 0)[0])
+          .filter((num) => num.length > 0) // Loại bỏ các ký tự trống
           .reverse(); // Lấy dãy số sau ký tự \b
         const remainingTime = parseInt(match[3], 10);
 
         // Kết hợp mảng số thành chuỗi
         const numbersString = numbers.join('-');
 
-        return { result, numbers: numbers, numbersString, remainingTime };
+        return { result, numbers, numbersString, remainingTime };
       }
 
       return null;
