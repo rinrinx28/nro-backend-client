@@ -427,19 +427,22 @@ export class MiddleEventService {
             });
           } else {
             // So sánh với phiên mới nhất
-            if (latestSession.lastResult.split('-')[0] === `${result}`) {
-              const update_mini = await this.miniGameModel.findByIdAndUpdate(
-                latestSession.id,
-                {
-                  timeEnd: this.addSeconds(new Date(), remainingTime),
-                },
-              );
-              this.socketGateway.server.emit('mini.bet', {
-                n_game: update_mini.toObject(),
-              });
-              this.logger.log(
-                `Session updated: SID: ${latestSession.id} - LastResult: ${latestSession.lastResult} - RemainingTime: ${remainingTime}`,
-              );
+            if (remainingTime !== 0) {
+              if (latestSession.lastResult.split('-')[0] === `${result}`) {
+                const update_mini = await this.miniGameModel.findByIdAndUpdate(
+                  latestSession.id,
+                  {
+                    timeEnd: this.addSeconds(new Date(), remainingTime),
+                  },
+                  { new: true, upsert: true },
+                );
+                this.socketGateway.server.emit('mini.bet', {
+                  n_game: update_mini.toObject(),
+                });
+                this.logger.log(
+                  `Session updated: SID: ${latestSession.id} - LastResult: ${latestSession.lastResult} - RemainingTime: ${remainingTime}`,
+                );
+              }
             } else {
               this.logger.log(
                 `Server: ${data.server} - Data is not valid, skipping...`,
