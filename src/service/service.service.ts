@@ -170,7 +170,7 @@ export class ServiceService {
     }
 
     const { pwd_h, ...user } = targetUser.toObject();
-    const { money } = user;
+    const { money, meta } = user;
     const revice = ['0', '1'].includes(type)
       ? (realAmount.money_trade ?? 0)
       : (realAmount.money_receive ?? 0);
@@ -210,8 +210,13 @@ export class ServiceService {
         update = {
           $inc: {
             money: +refund_money_rgold,
-            'meta.limitTrade': +refund_money_rgold,
-            'meta.trade': -refund_money_rgold,
+          },
+          $set: {
+            meta: {
+              ...meta,
+              limitTrade: meta.limitedTrade + refund_money_rgold,
+              trade: meta.limitedTrade - refund_money_rgold,
+            },
           },
         };
         await updateUser(
@@ -225,8 +230,13 @@ export class ServiceService {
         update = {
           $inc: {
             money: +amount,
-            'meta.limitTrade': +amount,
-            'meta.trade': -amount,
+          },
+          $set: {
+            meta: {
+              ...meta,
+              limitTrade: meta.limitedTrade + amount,
+              trade: meta.limitedTrade - amount,
+            },
           },
         };
         await updateUser(update, 'w_c_gold', money - amount, money);
@@ -261,8 +271,13 @@ export class ServiceService {
         update = {
           $inc: {
             money: +depositAmount,
-            'meta.deposit': +depositAmount,
-            'meta.totalScore': +depositAmount,
+          },
+          $set: {
+            meta: {
+              ...meta,
+              deposit: meta.deposit + depositAmount,
+              totalScore: meta.totalScore + depositAmount,
+            },
           },
         };
         await updateUser(
