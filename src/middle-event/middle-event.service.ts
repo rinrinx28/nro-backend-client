@@ -132,7 +132,12 @@ export class MiddleEventService {
       let { cl = 1.95, x = 3.2, g = 70 } = e_bet.option;
 
       // Let list user join the BET;
-      let users: { uid: string; revice: number; place: string }[] = [];
+      let users: {
+        uid: string;
+        revice: number;
+        place: string;
+        amount: number;
+      }[] = [];
       let userBets = [];
       let users_bet = await this.userBetModel.find({
         betId: old_game.id,
@@ -150,6 +155,7 @@ export class MiddleEventService {
               uid,
               revice: amount * rate,
               place: place,
+              amount: amount,
             });
           }
         } else if (typeBet === 'x') {
@@ -160,6 +166,7 @@ export class MiddleEventService {
               uid,
               revice: amount * rate,
               place: place,
+              amount: amount,
             });
           }
         } else {
@@ -170,6 +177,7 @@ export class MiddleEventService {
               uid,
               revice: amount * rate,
               place: place,
+              amount: amount,
             });
           }
         }
@@ -218,8 +226,9 @@ export class MiddleEventService {
           }
           user.markModified('meta');
           await user.save();
+          let res_s = this.show_res(w.place);
           notices.push(
-            `Chức mừng người chơi ${user.name} đã cược thắng ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${w.place}`,
+            `Chức mừng người chơi ${user.name} đã ${w.amount > 5e8 ? 'thắng lớn' : 'cược thắng'} ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${res_s}`,
           );
         }
         users_res.push({ _id: user.id, money: user.money });
@@ -658,6 +667,33 @@ export class MiddleEventService {
     } catch (err: any) {
       this.logger.log('Err Create MiniGame Client: ', err.message);
     }
+  }
+  show_res(res: string) {
+    if (res === 'C') {
+      return 'Chẵn';
+    }
+    if (res === 'L') {
+      return 'Lẻ';
+    }
+    if (res === 'T') {
+      return 'Tài';
+    }
+    if (res === 'X') {
+      return 'Xỉu';
+    }
+    if (res === 'CT') {
+      return 'Chẵn Tài';
+    }
+    if (res === 'CX') {
+      return 'Chẵn Xỉu';
+    }
+    if (res === 'LT') {
+      return 'Lẻ Tài';
+    }
+    if (res === 'LX') {
+      return 'Lẻ Xỉu';
+    }
+    return res;
   }
 }
 
