@@ -237,9 +237,11 @@ export class MiddleEventService {
 
           // Tạo thông báo cho người thắng cược
           let convert_key = this.convert_key(w.place);
-          notices.push(
-            `Chúc mừng người chơi ${user.name} đã ${w.amount >= 5e8 ? 'thắng lớn' : 'cược thắng'} ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
-          );
+          if (w.amount >= 5e8) {
+            notices.push(
+              `Chúc mừng người chơi ${user.name} đã thắng lớn ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
+            );
+          }
         }
 
         // Đưa kết quả cuối cùng của người dùng vào users_res
@@ -633,9 +635,11 @@ export class MiddleEventService {
 
           // Tạo thông báo cho người thắng cược
           let convert_key = this.convert_key(w.place);
-          notices.push(
-            `Chúc mừng người chơi ${user.name} đã ${w.amount >= 5e8 ? 'thắng lớn' : 'cược thắng'} ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
-          );
+          if (w.amount >= 5e8) {
+            notices.push(
+              `Chúc mừng người chơi ${user.name} đã thắng lớn ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
+            );
+          }
         }
 
         // Đưa kết quả cuối cùng của người dùng vào users_res
