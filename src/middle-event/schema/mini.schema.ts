@@ -22,7 +22,7 @@ export class MiniGame {
   @Prop()
   server: string;
 
-  @Prop({ type: SchemaTypes.Date })
+  @Prop({ type: Date })
   timeEnd: Date;
 
   @Prop({ default: {}, type: SchemaTypes.Mixed })
