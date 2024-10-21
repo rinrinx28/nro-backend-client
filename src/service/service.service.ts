@@ -171,9 +171,6 @@ export class ServiceService {
 
     const { pwd_h, ...user } = targetUser.toObject();
     const { money, meta } = user;
-    const revice = ['0', '1'].includes(type)
-      ? (realAmount.money_trade ?? 0)
-      : (realAmount.money_receive ?? 0);
 
     const updateUser = async (
       update: Record<string, any>,
@@ -260,6 +257,8 @@ export class ServiceService {
       // Refund money to User
       let update: Record<string, any>; // Declare the update variable here
       let activeName = '';
+
+      const revice = realAmount.money_receive;
 
       if (type === '0') {
         activeName = 'w_s_rgold';
