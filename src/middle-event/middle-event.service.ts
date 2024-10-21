@@ -434,7 +434,7 @@ export class MiddleEventService {
                 let current = moment(`${latestSession.timeEnd}`).unix();
                 let new_time = moment().unix();
                 let timeSecond_current = current - new_time;
-                if (timeSecond_current < remainingTime) {
+                if (timeSecond_current - remainingTime === 10) {
                   const update_mini =
                     await this.miniGameModel.findByIdAndUpdate(
                       latestSession.id,
