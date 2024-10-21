@@ -13,8 +13,8 @@ import { UserBet } from 'src/user/schema/userBet.schema';
 import { Message } from 'src/user/schema/message.schema';
 import { Bot } from 'src/bot/schema/bot.schema';
 import { Clan } from './schema/clan.schema';
-import { Session } from './schema/ISession.schema';
 import { Mutex } from 'async-mutex';
+import moment from 'moment';
 
 interface IData {
   uuid: string;
@@ -425,28 +425,40 @@ export class MiddleEventService {
             this.socketGateway.server.emit('mini.info', {
               n_game: updatedSession.toObject(),
             });
+            return;
           } else {
             // So sánh với phiên mới nhất
             if (remainingTime !== 0) {
               if (latestSession.lastResult.split('-')[0] === `${result}`) {
-                const update_mini = await this.miniGameModel.findByIdAndUpdate(
-                  latestSession.id,
-                  {
-                    timeEnd: this.addSeconds(new Date(), remainingTime),
-                  },
-                  { new: true, upsert: true },
-                );
-                this.socketGateway.server.emit('mini.bet', {
-                  n_game: update_mini.toObject(),
-                });
+                // Check time is down;
+                let current = moment(`${latestSession.timeEnd}`).unix();
+                let new_time = moment().unix();
+                let timeSecond_current = current - new_time;
+                if (timeSecond_current < remainingTime) {
+                  const update_mini =
+                    await this.miniGameModel.findByIdAndUpdate(
+                      latestSession.id,
+                      {
+                        timeEnd: this.addSeconds(new Date(), remainingTime),
+                      },
+                      { new: true, upsert: true },
+                    );
+                  this.socketGateway.server.emit('mini.bet', {
+                    n_game: update_mini.toObject(),
+                  });
+                  return;
+                }
                 this.logger.log(
                   `Session updated: SID: ${latestSession.id} - LastResult: ${latestSession.lastResult} - RemainingTime: ${remainingTime}`,
                 );
+                return;
               }
+              return;
             } else {
               this.logger.log(
                 `Server: ${data.server} - Data is not valid, skipping...`,
               );
+              return;
             }
           }
         } else {
@@ -463,6 +475,7 @@ export class MiddleEventService {
               this.logger.log(
                 `Valid data, continuing the session. ${remainingTime} - ${result} - ${numbers.join('-')}`,
               );
+              return;
             } else {
               // Check is next game
               // this.logger.log(numbers, oldSession.lastResult.split('-'));
@@ -483,7 +496,9 @@ export class MiddleEventService {
                     lastResult: numbers.join('-'),
                     timeEnd: this.addSeconds(new Date(), remainingTime),
                   });
+                  return;
                 }
+                return;
               } else {
                 if (remainingTime === 280) {
                   // Let create new
@@ -498,6 +513,7 @@ export class MiddleEventService {
                   );
                 }
               }
+              return;
             }
           } else {
             if (remainingTime === 280) {
@@ -509,11 +525,13 @@ export class MiddleEventService {
                 timeEnd: this.addSeconds(new Date(), remainingTime),
               });
               this.logger.log('Minigame Client: Data not match ... create new');
+              return;
             }
           }
         }
       } else {
         this.logger.log('Failed to parse content:', data.content);
+        return;
       }
       return;
     } catch (err: any) {
