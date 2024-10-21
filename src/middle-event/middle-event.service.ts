@@ -397,143 +397,103 @@ export class MiddleEventService {
     try {
       const parsedContent = this.parseContent(data.content);
 
-      if (parsedContent) {
-        const { result, numbers, remainingTime } = parsedContent;
+      if (!parsedContent) {
+        this.logger.log('Failed to parse content:', data.content);
+        return;
+      }
 
-        // Lấy phiên mới nhất từ cơ sở dữ liệu dựa vào server và isEnd
-        const latestSession = await this.miniGameModel
-          .findOne({
-            server: data.server,
-            isEnd: false,
-          })
-          .sort({ updatedAt: -1 });
+      const { result, numbers, remainingTime } = parsedContent;
 
-        if (latestSession) {
-          // Kiểm tra nếu remainingTime là 0
-          if (remainingTime === 0) {
-            // Đánh dấu phiên hiện tại là đã kết thúc
+      const latestSession = await this.miniGameModel
+        .findOne({ server: data.server, isEnd: false })
+        .sort({ updatedAt: -1 });
+
+      if (latestSession) {
+        if (remainingTime === 0) {
+          // Mark current session as ended
+          const updatedSession = await this.miniGameModel
+            .findByIdAndUpdate(
+              latestSession.id,
+              { isEnd: true },
+              { new: true, upsert: true },
+            )
+            .exec();
+
+          this.socketGateway.server.emit('mini.info', {
+            n_game: updatedSession.toObject(),
+          });
+          return;
+        }
+
+        // Compare latest session result
+        if (latestSession.lastResult.split('-')[0] === `${result}`) {
+          const timeDiff =
+            moment(`${latestSession.timeEnd}`).unix() - moment().unix();
+
+          if (timeDiff - remainingTime === 10) {
             const updatedSession = await this.miniGameModel
               .findByIdAndUpdate(
                 latestSession.id,
-                {
-                  isEnd: true,
-                },
+                { timeEnd: this.addSeconds(new Date(), remainingTime) },
                 { new: true, upsert: true },
               )
               .exec();
-            // TODO Send Client
-            this.socketGateway.server.emit('mini.info', {
+
+            this.socketGateway.server.emit('mini.bet', {
               n_game: updatedSession.toObject(),
             });
             return;
-          } else {
-            // So sánh với phiên mới nhất
-            if (remainingTime !== 0) {
-              if (latestSession.lastResult.split('-')[0] === `${result}`) {
-                // Check time is down;
-                let current = moment(`${latestSession.timeEnd}`).unix();
-                let new_time = moment().unix();
-                let timeSecond_current = current - new_time;
-                if (timeSecond_current - remainingTime === 10) {
-                  const update_mini =
-                    await this.miniGameModel.findByIdAndUpdate(
-                      latestSession.id,
-                      {
-                        timeEnd: this.addSeconds(new Date(), remainingTime),
-                      },
-                      { new: true, upsert: true },
-                    );
-                  this.socketGateway.server.emit('mini.bet', {
-                    n_game: update_mini.toObject(),
-                  });
-                  return;
-                }
-                this.logger.log(
-                  `Session updated: SID: ${latestSession.id} - LastResult: ${latestSession.lastResult} - RemainingTime: ${remainingTime}`,
-                );
-                return;
-              }
-              return;
-            } else {
-              this.logger.log(
-                `Server: ${data.server} - Data is not valid, skipping...`,
-              );
-              return;
-            }
           }
-        } else {
-          const oldSession = await this.miniGameModel
-            .findOne({
-              server: data.server,
-              isEnd: true,
-            })
-            .sort({ updatedAt: -1 });
-          if (oldSession) {
-            // Kiểm tra nếu remainingTime là 0
-            if (remainingTime === 0) {
-              // Đánh dấu phiên hiện tại là đã kết thúc
-              this.logger.log(
-                `Valid data, continuing the session. ${remainingTime} - ${result} - ${numbers.join('-')}`,
-              );
-              return;
-            } else {
-              // Check is next game
-              // this.logger.log(numbers, oldSession.lastResult.split('-'));
-              if (numbers[1] === oldSession.lastResult.split('-')[0]) {
-                // Let save update old data and Send Prizes
-                oldSession.result = numbers[0];
-                if (remainingTime === 280) {
-                  await oldSession.save();
-                  await this.givePrizesToWinerMiniGameClient({
-                    betId: oldSession.id,
-                    result: numbers[0],
-                    server: data.server,
-                  });
-                  // Let create new
-                  await this.CreateNewMiniGame({
-                    server: data.server,
-                    uuid: data.uuid,
-                    lastResult: numbers.join('-'),
-                    timeEnd: this.addSeconds(new Date(), remainingTime),
-                  });
-                  return;
-                }
-                return;
-              } else {
-                if (remainingTime === 280) {
-                  // Let create new
-                  await this.CreateNewMiniGame({
-                    server: data.server,
-                    uuid: data.uuid,
-                    lastResult: numbers.join('-'),
-                    timeEnd: this.addSeconds(new Date(), remainingTime),
-                  });
-                  this.logger.log(
-                    'Minigame Client: Data not match ... create new',
-                  );
-                }
-              }
-              return;
-            }
-          } else {
+
+          this.logger.log(
+            `Session updated: SID: ${latestSession.id} - LastResult: ${latestSession.lastResult} - RemainingTime: ${remainingTime}`,
+          );
+          return;
+        }
+      } else {
+        // Handle old sessions
+        const oldSession = await this.miniGameModel
+          .findOne({ server: data.server, isEnd: true })
+          .sort({ updatedAt: -1 });
+
+        if (oldSession) {
+          if (remainingTime === 0) {
+            this.logger.log(
+              `Valid data, continuing the session. ${remainingTime} - ${result} - ${numbers.join('-')}`,
+            );
+            return;
+          }
+
+          if (numbers[1] === oldSession.lastResult.split('-')[0]) {
+            oldSession.result = numbers[0];
+
             if (remainingTime === 280) {
-              // Let create new
+              await oldSession.save();
+              await this.givePrizesToWinerMiniGameClient({
+                betId: oldSession.id,
+                result: numbers[0],
+                server: data.server,
+              });
               await this.CreateNewMiniGame({
                 server: data.server,
                 uuid: data.uuid,
                 lastResult: numbers.join('-'),
                 timeEnd: this.addSeconds(new Date(), remainingTime),
               });
-              this.logger.log('Minigame Client: Data not match ... create new');
               return;
             }
+          } else if (remainingTime === 280) {
+            await this.CreateNewMiniGame({
+              server: data.server,
+              uuid: data.uuid,
+              lastResult: numbers.join('-'),
+              timeEnd: this.addSeconds(new Date(), remainingTime),
+            });
+            this.logger.log('Minigame Client: Data not match ... create new');
           }
+          return;
         }
-      } else {
-        this.logger.log('Failed to parse content:', data.content);
-        return;
       }
-      return;
     } catch (err: any) {
       this.logger.log(err);
     } finally {
