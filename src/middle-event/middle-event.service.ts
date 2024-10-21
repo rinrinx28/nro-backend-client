@@ -48,6 +48,17 @@ export class MiddleEventService {
   private logger: Logger = new Logger('Middle Handler');
   private readonly mutexMap = new Map<string, Mutex>();
 
+  private KeyConfig = [
+    { key: 'CT', name: 'Chẵn Tài' },
+    { key: 'LT', name: 'Lẻ Tài' },
+    { key: 'CX', name: 'Chẵn Xỉu' },
+    { key: 'LX', name: 'Lẻ Xỉu' },
+  ];
+
+  async show_result_text(res) {
+    return this.KeyConfig.find((k) => k.key === res).name;
+  }
+
   @OnEvent('bot.status', { async: true })
   async handleBotStatus(payload: BotStatuEvent) {
     const bot = await this.botModel.findOneAndUpdate(
@@ -227,8 +238,10 @@ export class MiddleEventService {
       await this.userActiveModel.insertMany(userActives);
 
       // Send notice result;
+      let split_res = s_res.split('_');
+      let res_key = this.show_result_text(split_res[0]);
       await this.sendNotiSystem({
-        content: `Máy chủ 24: Chúc mừng những người chơi đã chọn ${s_res}`,
+        content: `Máy chủ 24: Chúc mừng những người chơi đã chọn ${res_key}_${split_res[1]}`,
         server: old_game.server,
         uid: 'local',
       });
@@ -441,35 +454,41 @@ export class MiddleEventService {
                   result: numbers[0],
                   server: data.server,
                 });
-
-                // Create new Game;
-                await this.CreateNewMiniGame({
-                  server: data.server,
-                  uuid: data.uuid,
-                  lastResult: numbers.join('-'),
-                  timeEnd: this.addSeconds(new Date(), remainingTime),
-                });
+                if (remainingTime === 280) {
+                  // Let create new
+                  await this.CreateNewMiniGame({
+                    server: data.server,
+                    uuid: data.uuid,
+                    lastResult: numbers.join('-'),
+                    timeEnd: this.addSeconds(new Date(), remainingTime),
+                  });
+                }
               } else {
-                // Let create new
-                await this.CreateNewMiniGame({
-                  server: data.server,
-                  uuid: data.uuid,
-                  lastResult: numbers.join('-'),
-                  timeEnd: this.addSeconds(new Date(), remainingTime),
-                });
-                this.logger.log(
-                  'Minigame Client: Data not match ... create new',
-                );
+                if (remainingTime === 280) {
+                  // Let create new
+                  await this.CreateNewMiniGame({
+                    server: data.server,
+                    uuid: data.uuid,
+                    lastResult: numbers.join('-'),
+                    timeEnd: this.addSeconds(new Date(), remainingTime),
+                  });
+                  this.logger.log(
+                    'Minigame Client: Data not match ... create new',
+                  );
+                }
               }
             }
           } else {
-            // Let create new
-            await this.CreateNewMiniGame({
-              server: data.server,
-              uuid: data.uuid,
-              lastResult: numbers.join('-'),
-              timeEnd: this.addSeconds(new Date(), remainingTime),
-            });
+            if (remainingTime === 280) {
+              // Let create new
+              await this.CreateNewMiniGame({
+                server: data.server,
+                uuid: data.uuid,
+                lastResult: numbers.join('-'),
+                timeEnd: this.addSeconds(new Date(), remainingTime),
+              });
+              this.logger.log('Minigame Client: Data not match ... create new');
+            }
           }
         }
       } else {
