@@ -14,7 +14,7 @@ import { Message } from 'src/user/schema/message.schema';
 import { Bot } from 'src/bot/schema/bot.schema';
 import { Clan } from './schema/clan.schema';
 import { Mutex } from 'async-mutex';
-import moment from 'moment';
+import * as moment from 'moment';
 
 interface IData {
   uuid: string;
