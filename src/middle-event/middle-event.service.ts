@@ -226,9 +226,9 @@ export class MiddleEventService {
           }
           user.markModified('meta');
           await user.save();
-          let res_s = this.show_res(w.place);
+          let convert_key = this.convert_key(w.place);
           notices.push(
-            `Chức mừng người chơi ${user.name} đã ${w.amount > 5e8 ? 'thắng lớn' : 'cược thắng'} ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${res_s}`,
+            `Chức mừng người chơi ${user.name} đã ${w.amount > 5e8 ? 'thắng lớn' : 'cược thắng'} ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
           );
         }
         users_res.push({ _id: user.id, money: user.money });
@@ -539,7 +539,12 @@ export class MiddleEventService {
       let { cl = 1.95, x = 3.2, g = 70 } = e_bet.option;
 
       // Let list user join the BET;
-      let users: { uid: string; revice: number; place: string }[] = [];
+      let users: {
+        uid: string;
+        revice: number;
+        place: string;
+        amount: number;
+      }[] = [];
       let userBets = [];
       let users_bet = await this.userBetModel.find({
         betId: betId,
@@ -558,6 +563,7 @@ export class MiddleEventService {
               uid,
               revice: amount * rate,
               place: place,
+              amount: amount,
             });
           }
         } else if (typeBet === 'x') {
@@ -568,6 +574,7 @@ export class MiddleEventService {
               uid,
               revice: amount * rate,
               place: place,
+              amount: amount,
             });
           }
         } else {
@@ -578,6 +585,7 @@ export class MiddleEventService {
               uid,
               revice: amount * rate,
               place: place,
+              amount: amount,
             });
           }
         }
@@ -624,8 +632,9 @@ export class MiddleEventService {
           }
           user.markModified('meta');
           await user.save();
+          let convert_key = this.convert_key(w.place);
           notices.push(
-            `Chức mừng người chơi ${user.name} đã cược thắng ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${w.place}`,
+            `Chức mừng người chơi ${user.name} đã ${w.amount > 5e8 ? 'thắng lớn' : 'cược thắng'} ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
           );
         }
         users_res.push({ _id: user.id, money: user.money });
@@ -680,7 +689,8 @@ export class MiddleEventService {
       this.logger.log('Err Create MiniGame Client: ', err.message);
     }
   }
-  show_res(res: string) {
+
+  convert_key(res: string) {
     if (res === 'C') {
       return 'Chẵn';
     }
