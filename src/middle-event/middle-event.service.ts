@@ -482,13 +482,13 @@ export class MiddleEventService {
               if (numbers[1] === oldSession.lastResult.split('-')[0]) {
                 // Let save update old data and Send Prizes
                 oldSession.result = numbers[0];
-                await oldSession.save();
-                await this.givePrizesToWinerMiniGameClient({
-                  betId: oldSession.id,
-                  result: numbers[0],
-                  server: data.server,
-                });
                 if (remainingTime === 280) {
+                  await oldSession.save();
+                  await this.givePrizesToWinerMiniGameClient({
+                    betId: oldSession.id,
+                    result: numbers[0],
+                    server: data.server,
+                  });
                   // Let create new
                   await this.CreateNewMiniGame({
                     server: data.server,
