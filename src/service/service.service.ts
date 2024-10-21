@@ -131,7 +131,7 @@ export class ServiceService {
             id,
             {
               ...data,
-              revice: revice,
+              revice: amount,
             },
             {
               new: true,
@@ -148,7 +148,7 @@ export class ServiceService {
           service = {
             ...service,
             ...data,
-            revice: revice,
+            revice: amount,
           };
           this.socketGateway.server.emit('service.update', service);
           return 'ok';
@@ -166,9 +166,6 @@ export class ServiceService {
     const target_u = await this.userModel.findById(uid);
     let { pwd_h, ...user } = target_u.toObject();
     let { money } = user;
-    let revice = ['2', '3'].includes(type)
-      ? (realAmount.money_receive ?? 0)
-      : (realAmount.money_trade ?? 0);
 
     if (typeUpdate === '1') {
       // Refund money to User;
@@ -290,7 +287,7 @@ export class ServiceService {
         });
         return;
       } else if (type === '2') {
-        let deposit_rgold = revice * 1e6 * 37;
+        let deposit_rgold = amount * 1e6 * 37;
         let user_rgold = await this.userModel.findByIdAndUpdate(
           uid,
           {
@@ -326,9 +323,9 @@ export class ServiceService {
           uid,
           {
             $inc: {
-              money: +revice,
-              'meta.deposit': +revice,
-              'meta.totalScore': +revice,
+              money: +amount,
+              'meta.deposit': +amount,
+              'meta.totalScore': +amount,
             },
           },
           {
@@ -343,7 +340,7 @@ export class ServiceService {
           active: {
             name: 'd_gold',
             status: typeUpdate,
-            m_current: res_u.money - revice,
+            m_current: res_u.money - amount,
             m_new: res_u.money,
           },
         });
