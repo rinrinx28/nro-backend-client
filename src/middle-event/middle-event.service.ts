@@ -210,6 +210,7 @@ export class MiddleEventService {
           // Cập nhật tiền và meta cho user
           user.money += revice;
           user.meta.totalTrade += revice; // Cập nhật tổng giao dịch
+          user.meta.limitTrade += revice; // Cập nhật limitedTrade
           let { clanId = null } = user.meta; // Kiểm tra clanId từ meta
 
           // Cập nhật điểm cho clan nếu có clanId
@@ -605,6 +606,7 @@ export class MiddleEventService {
           // Cập nhật tiền và meta cho user
           user.money += revice;
           user.meta.totalTrade += revice; // Cập nhật tổng giao dịch
+          user.meta.limitTrade += revice; // Cập nhật limitedTrade
           let { clanId = null } = user.meta; // Kiểm tra clanId từ meta
 
           // Cập nhật điểm cho clan nếu có clanId
