@@ -382,9 +382,10 @@ export class MiddleEventService {
         const numbers = match[2]
           .split(',')
           .map((num) => num.trim())
-          .map((s) => s.split('\b').filter((f) => f.length > 0)[0])
-          .filter((num) => num.length > 0) // Loại bỏ các ký tự trống
+          .flatMap((s) => s.split('\b')) // Sử dụng flatMap thay vì map để tránh mảng lồng nhau
+          .filter((f) => f && f.length > 0) // Loại bỏ các ký tự trống và undefined
           .reverse(); // Lấy dãy số sau ký tự \b
+
         const remainingTime = parseInt(match[3], 10);
 
         // Kết hợp mảng số thành chuỗi
