@@ -428,8 +428,14 @@ export class MiddleEventService {
           } else {
             // So sánh với phiên mới nhất
             if (latestSession.lastResult.split('-')[0] === `${result}`) {
-              await this.miniGameModel.findByIdAndUpdate(latestSession.id, {
-                timeEnd: this.addSeconds(new Date(), remainingTime),
+              const update_mini = await this.miniGameModel.findByIdAndUpdate(
+                latestSession.id,
+                {
+                  timeEnd: this.addSeconds(new Date(), remainingTime),
+                },
+              );
+              this.socketGateway.server.emit('mini.bet', {
+                n_game: update_mini.toObject(),
               });
               this.logger.log(
                 `Session updated: SID: ${latestSession.id} - LastResult: ${latestSession.lastResult} - RemainingTime: ${remainingTime}`,
