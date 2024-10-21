@@ -432,7 +432,7 @@ export class MiddleEventService {
               { new: true, upsert: true },
             )
             .exec();
-          this.socketGateway.server.emit('mini.info', {
+          this.socketGateway.server.emit('mini.bet', {
             n_game: updatedSession.toObject(),
           });
           return;
