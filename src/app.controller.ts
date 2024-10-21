@@ -126,8 +126,8 @@ export class AppController {
             status: '1',
           },
           realAmount: {
-            money_trade: Number(money_trade ?? 0),
-            money_receive: Number(money_receive ?? 0),
+            money_trade: parseInt(money_trade, 10),
+            money_receive: parseInt(money_receive, 10),
           },
         });
       case '2':
@@ -136,6 +136,7 @@ export class AppController {
         // / + money_current: vàng/thỏi vàng sau giao dịch của bot (vàng/thỏi vàng hiện tại)
         // / + money_trade: vàng/thỏi vàng mà bot giao dịch
         // / + money_receive: vàng/thỏi vàng mà người chơi giao dịch
+        console.log(money_trade, money_receive);
         return this.service.updateService({
           id: service_id,
           typeUpdate: '2',
@@ -144,8 +145,8 @@ export class AppController {
             status: '2',
           },
           realAmount: {
-            money_trade: Number(money_trade ?? 0),
-            money_receive: Number(money_receive ?? 0),
+            money_trade: parseInt(money_trade, 10),
+            money_receive: parseInt(money_receive, 10),
           },
         });
       default:

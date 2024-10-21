@@ -79,6 +79,10 @@ export class ServiceService {
       if (!target_s) throw new Error('Không tìm thấy Giao Dịch');
       this.logger.log(`Update Service: ${id} - Status: ${typeUpdate}`);
       const { type, amount, uid } = target_s.toObject();
+      let revice = ['0', '1'].includes(type)
+        ? realAmount.money_trade
+        : realAmount.money_receive;
+
       // Check min & max;
       if (['0', '2'].includes(type)) {
         if (amount < min_rgold)
@@ -117,14 +121,17 @@ export class ServiceService {
           this.socketGateway.server.emit('service.update', service);
           return 'ok';
         default:
-          await this.serviceModel.findByIdAndUpdate(id, {
-            ...data,
-            $inc: {
-              revice: ['2', '3'].includes(type)
-                ? realAmount.money_trade
-                : realAmount.money_receive,
+          await this.serviceModel.findByIdAndUpdate(
+            id,
+            {
+              ...data,
+              revice: revice,
             },
-          });
+            {
+              new: true,
+              upsert: true,
+            },
+          );
           await this.updateUserWithType({
             uid: uid.toString(),
             amount,
@@ -135,9 +142,7 @@ export class ServiceService {
           service = {
             ...service,
             ...data,
-            revice: ['2', '3'].includes(type)
-              ? realAmount.money_trade
-              : realAmount.money_receive,
+            revice: revice,
           };
           this.socketGateway.server.emit('service.update', service);
           return 'ok';
@@ -155,6 +160,9 @@ export class ServiceService {
     const target_u = await this.userModel.findById(uid);
     let { pwd_h, ...user } = target_u.toObject();
     let { money } = user;
+    let revice = ['0', '1'].includes(type)
+      ? realAmount.money_trade
+      : realAmount.money_receive;
 
     if (typeUpdate === '1') {
       // Refund money to User;
@@ -262,7 +270,7 @@ export class ServiceService {
         });
         return;
       } else if (type === '2') {
-        let deposit_rgold = realAmount.money_receive * 1e6 * 37;
+        let deposit_rgold = revice * 1e6 * 37;
         let user_rgold = await this.userModel.findByIdAndUpdate(uid, {
           $inc: {
             money: +deposit_rgold,
@@ -289,9 +297,9 @@ export class ServiceService {
       } else {
         let user_gold = await this.userModel.findByIdAndUpdate(uid, {
           $inc: {
-            money: +realAmount.money_receive,
-            'meta.deposit': +realAmount.money_receive,
-            'meta.totalScore': +realAmount.money_receive,
+            money: +revice,
+            'meta.deposit': +revice,
+            'meta.totalScore': +revice,
           },
         });
         let { pwd_h, ...res_u } = user_gold;
@@ -301,7 +309,7 @@ export class ServiceService {
           active: {
             name: 'd_gold',
             status: typeUpdate,
-            m_current: res_u.money - realAmount.money_receive,
+            m_current: res_u.money - revice,
             m_new: res_u.money,
           },
         });
