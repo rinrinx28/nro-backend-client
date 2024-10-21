@@ -177,7 +177,7 @@ export class ServiceService {
           },
         });
 
-        let { pwd_h, ...res_u } = user_rgold;
+        let { pwd_h, ...res_u } = user_rgold.toObject();
 
         // save active
         await this.userActiveModel.create({
@@ -202,7 +202,7 @@ export class ServiceService {
             'meta.trade': -amount,
           },
         });
-        let { pwd_h, ...res_u } = user_gold;
+        let { pwd_h, ...res_u } = user_gold.toObject();
 
         // save active
         await this.userActiveModel.create({
@@ -279,7 +279,7 @@ export class ServiceService {
           },
         });
 
-        let { pwd_h, ...res_u } = user_rgold;
+        let { pwd_h, ...res_u } = user_rgold.toObject();
 
         await this.userActiveModel.create({
           uid: uid,
@@ -302,7 +302,7 @@ export class ServiceService {
             'meta.totalScore': +revice,
           },
         });
-        let { pwd_h, ...res_u } = user_gold;
+        let { pwd_h, ...res_u } = user_gold.toObject();
 
         await this.userActiveModel.create({
           uid: uid,

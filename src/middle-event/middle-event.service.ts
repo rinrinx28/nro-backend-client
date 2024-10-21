@@ -147,40 +147,31 @@ export class MiddleEventService {
       // Find Winer and save user bet;
       for (const user_bet of users_bet) {
         const { place, typeBet, amount, uid } = user_bet;
+
+        let rate;
+        let isWinner = false;
+
         if (typeBet === 'cl') {
-          let rate = cl;
-          if (s_res.split('_')[0].includes(place)) {
-            user_bet.revice = amount * rate;
-            users.push({
-              uid,
-              revice: amount * rate,
-              place: place,
-              amount: amount,
-            });
-          }
+          rate = cl;
+          isWinner = s_res.split('_')[0].includes(place);
         } else if (typeBet === 'x') {
-          let rate = x;
-          if (s_res.split('_')[0].includes(place)) {
-            user_bet.revice = amount * rate;
-            users.push({
-              uid,
-              revice: amount * rate,
-              place: place,
-              amount: amount,
-            });
-          }
+          rate = x;
+          isWinner = s_res.split('_')[0] === place;
         } else {
-          let rate = g;
-          if (s_res.split('_')[1] === place) {
-            user_bet.revice = amount * rate;
-            users.push({
-              uid,
-              revice: amount * rate,
-              place: place,
-              amount: amount,
-            });
-          }
+          rate = g;
+          isWinner = s_res.split('_')[1] === place;
         }
+
+        if (isWinner) {
+          user_bet.revice = amount * rate;
+          users.push({
+            uid,
+            revice: user_bet.revice,
+            place,
+            amount,
+          });
+        }
+        // Update the user_bet status and fields
         user_bet.isEnd = true;
         user_bet.status = 2;
         user_bet.result = res.result;
@@ -201,6 +192,8 @@ export class MiddleEventService {
         const winner = users.filter((u) => u.uid === user.id);
         for (const w of winner) {
           const { revice } = w;
+
+          // Cập nhật thông tin active cho người chơi thắng cược
           userActives.push({
             uid: user.id,
             active: {
@@ -210,27 +203,45 @@ export class MiddleEventService {
               m_new: user.money + revice,
               place: w.place,
               server: old_game.server,
+              amount: w.amount,
             },
           });
 
-          // Update revice and score user;
+          // Cập nhật tiền và meta cho user
           user.money += revice;
-          user.meta.totalTrade += revice;
-          let { clanId = null } = user.meta;
-          // Update score clan
+          user.meta.totalTrade += revice; // Cập nhật tổng giao dịch
+          let { clanId = null } = user.meta; // Kiểm tra clanId từ meta
+
+          // Cập nhật điểm cho clan nếu có clanId
           if (clanId) {
-            user.meta.score += revice;
+            user.meta.totalScore += revice; // Cập nhật tổng điểm của user
             let clan = clans.findIndex((c) => c.clanId === clanId);
-            if (clan < 0) clans.push({ clanId, score: revice });
-            clans[clan].score += revice;
+            if (clan < 0) {
+              clans.push({ clanId, score: revice });
+            } else {
+              clans[clan].score += revice;
+            }
           }
+
+          // Đánh dấu trường meta đã thay đổi
           user.markModified('meta');
-          await user.save();
+
+          // Lưu user vào database
+          try {
+            await user.save();
+            console.log(`Cập nhật thành công cho user: ${user.id}`);
+          } catch (err) {
+            console.error(`Lỗi khi lưu user ${user.id}:`, err);
+          }
+
+          // Tạo thông báo cho người thắng cược
           let convert_key = this.convert_key(w.place);
           notices.push(
-            `Chức mừng người chơi ${user.name} đã ${w.amount > 5e8 ? 'thắng lớn' : 'cược thắng'} ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
+            `Chúc mừng người chơi ${user.name} đã ${w.amount > 5e8 ? 'thắng lớn' : 'cược thắng'} ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
           );
         }
+
+        // Đưa kết quả cuối cùng của người dùng vào users_res
         users_res.push({ _id: user.id, money: user.money });
       }
 
@@ -528,44 +539,34 @@ export class MiddleEventService {
         isEnd: false,
       });
       let notices: string[] = [];
-
       // Find Winer and save user bet;
       for (const user_bet of users_bet) {
         const { place, typeBet, amount, uid } = user_bet;
+
+        let rate;
+        let isWinner = false;
+
         if (typeBet === 'cl') {
-          let rate = cl;
-          if (s_res.split('_')[0].includes(place)) {
-            user_bet.revice = amount * rate;
-            users.push({
-              uid,
-              revice: amount * rate,
-              place: place,
-              amount: amount,
-            });
-          }
+          rate = cl;
+          isWinner = s_res.split('_')[0].includes(place);
         } else if (typeBet === 'x') {
-          let rate = x;
-          if (s_res.split('_')[0].includes(place)) {
-            user_bet.revice = amount * rate;
-            users.push({
-              uid,
-              revice: amount * rate,
-              place: place,
-              amount: amount,
-            });
-          }
+          rate = x;
+          isWinner = s_res.split('_')[0] === place;
         } else {
-          let rate = g;
-          if (s_res.split('_')[1] === place) {
-            user_bet.revice = amount * rate;
-            users.push({
-              uid,
-              revice: amount * rate,
-              place: place,
-              amount: amount,
-            });
-          }
+          rate = g;
+          isWinner = s_res.split('_')[1] === place;
         }
+
+        if (isWinner) {
+          user_bet.revice = amount * rate;
+          users.push({
+            uid,
+            revice: user_bet.revice,
+            place,
+            amount,
+          });
+        }
+        // Update the user_bet status and fields
         user_bet.isEnd = true;
         user_bet.status = 2;
         user_bet.result = result;
@@ -586,34 +587,56 @@ export class MiddleEventService {
         const winner = users.filter((u) => u.uid === user.id);
         for (const w of winner) {
           const { revice } = w;
+
+          // Cập nhật thông tin active cho người chơi thắng cược
           userActives.push({
             uid: user.id,
             active: {
               name: 'winer_bet',
-              betId: betId,
+              betId: old_game.id,
               m_current: user.money,
               m_new: user.money + revice,
               place: w.place,
               server: old_game.server,
+              amount: w.amount,
             },
           });
+
+          // Cập nhật tiền và meta cho user
           user.money += revice;
-          user.meta.totalTrade += revice;
-          let { clanId = null } = user.meta;
-          // Update Clan
+          user.meta.totalTrade += revice; // Cập nhật tổng giao dịch
+          let { clanId = null } = user.meta; // Kiểm tra clanId từ meta
+
+          // Cập nhật điểm cho clan nếu có clanId
           if (clanId) {
-            user.meta.score += revice;
+            user.meta.totalScore += revice; // Cập nhật tổng điểm của user
             let clan = clans.findIndex((c) => c.clanId === clanId);
-            if (clan < 0) clans.push({ clanId, score: revice });
-            clans[clan].score += revice;
+            if (clan < 0) {
+              clans.push({ clanId, score: revice });
+            } else {
+              clans[clan].score += revice;
+            }
           }
+
+          // Đánh dấu trường meta đã thay đổi
           user.markModified('meta');
-          await user.save();
+
+          // Lưu user vào database
+          try {
+            await user.save();
+            console.log(`Cập nhật thành công cho user: ${user.id}`);
+          } catch (err) {
+            console.error(`Lỗi khi lưu user ${user.id}:`, err);
+          }
+
+          // Tạo thông báo cho người thắng cược
           let convert_key = this.convert_key(w.place);
           notices.push(
-            `Chức mừng người chơi ${user.name} đã ${w.amount > 5e8 ? 'thắng lớn' : 'cược thắng'} ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
+            `Chúc mừng người chơi ${user.name} đã ${w.amount > 5e8 ? 'thắng lớn' : 'cược thắng'} ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
           );
         }
+
+        // Đưa kết quả cuối cùng của người dùng vào users_res
         users_res.push({ _id: user.id, money: user.money });
       }
       // Save clan;
@@ -629,8 +652,10 @@ export class MiddleEventService {
       await this.userActiveModel.insertMany(userActives);
 
       // Send notice result;
+      let split_res = s_res.split('_');
+      let res_key = this.show_result_text(split_res[0]);
       await this.sendNotiSystem({
-        content: `Máy chủ ${server}: Chúc mừng những người chơi đã chọn ${s_res}`,
+        content: `Máy chủ ${server}: Chúc mừng những người chơi đã chọn ${res_key}_${split_res[1]}`,
         server: server,
         uid: 'local',
       });
