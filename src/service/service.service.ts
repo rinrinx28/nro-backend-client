@@ -106,10 +106,16 @@ export class ServiceService {
       let service = target_s.toObject();
       switch (typeUpdate) {
         case '0':
-          await this.serviceModel.findByIdAndUpdate(id, data);
+          await this.serviceModel.findByIdAndUpdate(id, data, {
+            new: true,
+            upsert: true,
+          });
           return;
         case '1':
-          await this.serviceModel.findByIdAndUpdate(id, data);
+          await this.serviceModel.findByIdAndUpdate(id, data, {
+            new: true,
+            upsert: true,
+          });
           await this.updateUserWithType({
             uid: uid.toString(),
             amount,
@@ -169,13 +175,20 @@ export class ServiceService {
       if (type === '0') {
         let refund_money_rgold = amount * 1e6 * 37;
         // Refund Money to user with rate 1e6*37
-        let user_rgold = await this.userModel.findByIdAndUpdate(uid, {
-          $inc: {
-            money: +refund_money_rgold,
-            'meta.limitTrade': +refund_money_rgold,
-            'meta.trade': -refund_money_rgold,
+        let user_rgold = await this.userModel.findByIdAndUpdate(
+          uid,
+          {
+            $inc: {
+              money: +refund_money_rgold,
+              'meta.limitTrade': +refund_money_rgold,
+              'meta.trade': -refund_money_rgold,
+            },
           },
-        });
+          {
+            new: true,
+            upsert: true,
+          },
+        );
 
         let { pwd_h, ...res_u } = user_rgold.toObject();
 
@@ -195,13 +208,20 @@ export class ServiceService {
         return;
       } else if (type === '1') {
         // Refund Money to user with rate 1e6*37
-        let user_gold = await this.userModel.findByIdAndUpdate(uid, {
-          $inc: {
-            money: +amount,
-            'meta.limitTrade': +amount,
-            'meta.trade': -amount,
+        let user_gold = await this.userModel.findByIdAndUpdate(
+          uid,
+          {
+            $inc: {
+              money: +amount,
+              'meta.limitTrade': +amount,
+              'meta.trade': -amount,
+            },
           },
-        });
+          {
+            new: true,
+            upsert: true,
+          },
+        );
         let { pwd_h, ...res_u } = user_gold.toObject();
 
         // save active
@@ -271,13 +291,20 @@ export class ServiceService {
         return;
       } else if (type === '2') {
         let deposit_rgold = revice * 1e6 * 37;
-        let user_rgold = await this.userModel.findByIdAndUpdate(uid, {
-          $inc: {
-            money: +deposit_rgold,
-            'meta.deposit': +deposit_rgold,
-            'meta.totalScore': +deposit_rgold,
+        let user_rgold = await this.userModel.findByIdAndUpdate(
+          uid,
+          {
+            $inc: {
+              money: +deposit_rgold,
+              'meta.deposit': +deposit_rgold,
+              'meta.totalScore': +deposit_rgold,
+            },
           },
-        });
+          {
+            new: true,
+            upsert: true,
+          },
+        );
 
         let { pwd_h, ...res_u } = user_rgold.toObject();
 
@@ -295,13 +322,20 @@ export class ServiceService {
         });
         return;
       } else {
-        let user_gold = await this.userModel.findByIdAndUpdate(uid, {
-          $inc: {
-            money: +revice,
-            'meta.deposit': +revice,
-            'meta.totalScore': +revice,
+        let user_gold = await this.userModel.findByIdAndUpdate(
+          uid,
+          {
+            $inc: {
+              money: +revice,
+              'meta.deposit': +revice,
+              'meta.totalScore': +revice,
+            },
           },
-        });
+          {
+            new: true,
+            upsert: true,
+          },
+        );
         let { pwd_h, ...res_u } = user_gold.toObject();
 
         await this.userActiveModel.create({
