@@ -440,7 +440,10 @@ export class MiddleEventService {
         }
 
         // Compare latest session result
-        if (latestSession.lastResult.split('-')[0] === `${result}`) {
+        if (
+          numbers[0] === latestSession.lastResult.split('-')[0] &&
+          numbers[1] === latestSession.lastResult.split('-')[1]
+        ) {
           const timeDiff =
             moment(`${latestSession.timeEnd}`).unix() - moment().unix();
 
@@ -478,10 +481,12 @@ export class MiddleEventService {
             return;
           }
 
+          // Check is next Session
+          oldSession.result = numbers[0];
           if (numbers[1] === oldSession.lastResult.split('-')[0]) {
-            oldSession.result = numbers[0];
-
+            // Await to 280s
             if (remainingTime === 280) {
+              // save result
               await oldSession.save();
               await this.givePrizesToWinerMiniGameClient({
                 betId: oldSession.id,
@@ -497,6 +502,13 @@ export class MiddleEventService {
               return;
             }
           } else if (remainingTime === 280) {
+            // save result
+            await oldSession.save();
+            await this.givePrizesToWinerMiniGameClient({
+              betId: oldSession.id,
+              result: numbers[0],
+              server: data.server,
+            });
             await this.CreateNewMiniGame({
               server: data.server,
               uuid: data.uuid,
@@ -694,9 +706,13 @@ export class MiddleEventService {
       this.socketGateway.server.emit('mini.bet', {
         n_game: newMiniGame.toObject(),
       });
-      this.logger.log('Create MiniGame Client: ', newMiniGame.id);
+      this.logger.log(
+        `Create MiniGame Client: ${newMiniGame.id} - ${payload.server}`,
+      );
     } catch (err: any) {
-      this.logger.log('Err Create MiniGame Client: ', err.message);
+      this.logger.log(
+        `Err Create MiniGame Client: ${err.message} - ${payload.server}`,
+      );
     }
   }
 
