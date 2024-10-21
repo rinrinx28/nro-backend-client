@@ -693,6 +693,7 @@ export class MiddleEventService {
       this.socketGateway.server.emit('mini.bet', {
         n_game: newMiniGame.toObject(),
       });
+      this.logger.log('Create MiniGame Client: ', newMiniGame.id);
     } catch (err: any) {
       this.logger.log('Err Create MiniGame Client: ', err.message);
     }
