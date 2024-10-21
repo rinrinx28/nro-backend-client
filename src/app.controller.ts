@@ -108,10 +108,6 @@ export class AppController {
             playerName: playerName,
             bot_id: bot_id,
           },
-          realAmount: {
-            money_trade: Number(money_trade ?? 0),
-            money_receive: Number(money_receive ?? 0),
-          },
         });
         return `ok|${player_id}|${_id}|${type}|${amount}`;
       case '1':

@@ -398,7 +398,7 @@ export class MiddleEventService {
       const parsedContent = this.parseContent(data.content);
 
       if (!parsedContent) {
-        this.logger.log('Failed to parse content:', data.content);
+        // this.logger.log('Failed to parse content:', data.content);
         return;
       }
 
@@ -418,7 +418,6 @@ export class MiddleEventService {
               { new: true, upsert: true },
             )
             .exec();
-
           this.socketGateway.server.emit('mini.info', {
             n_game: updatedSession.toObject(),
           });
@@ -445,9 +444,9 @@ export class MiddleEventService {
             return;
           }
 
-          this.logger.log(
-            `Session updated: SID: ${latestSession.id} - LastResult: ${latestSession.lastResult} - RemainingTime: ${remainingTime}`,
-          );
+          // this.logger.log(
+          //   `Session updated: SID: ${latestSession.id} - LastResult: ${latestSession.lastResult} - RemainingTime: ${remainingTime}`,
+          // );
           return;
         }
       } else {
@@ -458,9 +457,9 @@ export class MiddleEventService {
 
         if (oldSession) {
           if (remainingTime === 0) {
-            this.logger.log(
-              `Valid data, continuing the session. ${remainingTime} - ${result} - ${numbers.join('-')}`,
-            );
+            // this.logger.log(
+            //   `Valid data, continuing the session. ${remainingTime} - ${result} - ${numbers.join('-')}`,
+            // );
             return;
           }
 
@@ -489,7 +488,7 @@ export class MiddleEventService {
               lastResult: numbers.join('-'),
               timeEnd: this.addSeconds(new Date(), remainingTime),
             });
-            this.logger.log('Minigame Client: Data not match ... create new');
+            // this.logger.log('Minigame Client: Data not match ... create new');
           }
           return;
         }

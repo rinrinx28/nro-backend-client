@@ -11,7 +11,7 @@ interface UpdateService {
   id: string;
   typeUpdate: '1' | '2' | '0';
   data: any;
-  realAmount: Record<string, number>;
+  realAmount?: Record<string, number>;
 }
 
 interface UpdateUserWithTypeService {
@@ -51,8 +51,10 @@ export class ServiceService {
         throw new Error(
           'giao dịch của bạn bị hủy, xin tạo lại tại nrogam e.m e',
         );
-      this.logger.log(`Query Service ${playerName} - ${service.id}`);
-      return service;
+      this.logger.log(
+        `Query Service ${playerName} - ${service.id} - amount:${service.amount} - Type: ${service.type}`,
+      );
+      return service.toObject();
     } catch (err: any) {
       this.logger.log(`Query Service ${playerName} - ${err.message}`);
       return err.message;
