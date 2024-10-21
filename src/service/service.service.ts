@@ -64,45 +64,14 @@ export class ServiceService {
   async updateService(payload: UpdateService) {
     try {
       const e_shop = await this.EConfigModel.findOne({ name: 'e_shop' });
-      const {
-        option: {
-          min_gold = 50e6,
-          min_rgold = 5,
-          max_gold = 600e6,
-          max_rgold = 40,
-        },
-        isEnable,
-      } = e_shop;
+      const { isEnable } = e_shop;
       if (!isEnable) throw new Error('Chức năng nạp/rút tạm đóng!');
       const { data, typeUpdate, id, realAmount } = payload;
       const target_s = await this.serviceModel.findById(id);
       if (!target_s) throw new Error('Không tìm thấy Giao Dịch');
       this.logger.log(`Update Service: ${id} - Status: ${typeUpdate}`);
       const { type, amount, uid } = target_s.toObject();
-      let revice = ['2', '3'].includes(type)
-        ? (realAmount.money_receive ?? 0)
-        : (realAmount.money_trade ?? 0);
 
-      // Check min & max;
-      if (['0', '2'].includes(type)) {
-        if (amount < min_rgold)
-          throw new Error(
-            `Bạn không thể giao dịch thấp hơn ${min_rgold} thỏi vàng`,
-          );
-        if (amount > max_rgold)
-          throw new Error(
-            `Bạn không thể giao dịch cao hơn ${max_rgold} thỏi vàng`,
-          );
-      } else {
-        if (amount < min_gold)
-          throw new Error(
-            `Bạn không thể giao dịch thấp hơn ${new Intl.NumberFormat('vi').format(min_gold)} vàng`,
-          );
-        if (amount > max_gold)
-          throw new Error(
-            `Bạn không thể giao dịch cao hơn ${new Intl.NumberFormat('vi').format(max_gold)} vàng`,
-          );
-      }
       let service = target_s.toObject();
       switch (typeUpdate) {
         case '0':
