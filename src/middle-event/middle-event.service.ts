@@ -394,7 +394,7 @@ export class MiddleEventService {
       if (numbers && seconds) {
         // Trích xuất dãy số và giây
         return {
-          numbers: numbers[0].split(',') || [],
+          numbers: numbers[0].split(',').reverse() || [],
           remainingTime: parseInt(seconds[0], 10) || 0,
         };
       }
