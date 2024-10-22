@@ -162,10 +162,10 @@ export class MiddleEventService {
           if (isRes % 2 !== 0 && place === 'L') {
             isWinner = true;
           }
-          if (isRes < 5 && place === 'X') {
+          if (isRes <= 4 && place === 'X') {
             isWinner = true;
           }
-          if (isRes > 4 && place === 'T') {
+          if (isRes >= 5 && place === 'T') {
             isWinner = true;
           }
         } else if (typeBet === 'x') {
@@ -346,13 +346,13 @@ export class MiddleEventService {
   }
 
   showResult(res: string) {
-    let result = `${Number(res) > 9 ? res : `0${res}`}`;
+    let result = `${parseInt(res, 10) > 9 ? parseInt(res, 10) : `0${parseInt(res, 10)}`}`;
     let new_result = `${result}`[1];
     let obj_result = {
-      c: Number(new_result) % 2 === 0,
-      l: Number(new_result) % 2 !== 0,
-      x: Number(new_result) < 5,
-      t: Number(new_result) > 4,
+      c: parseInt(new_result, 10) % 2 === 0,
+      l: parseInt(new_result, 10) % 2 !== 0,
+      x: parseInt(new_result, 10) < 5,
+      t: parseInt(new_result, 10) > 4,
       total: {
         CL: '',
         TX: '',
@@ -363,7 +363,7 @@ export class MiddleEventService {
     obj_result.total.CL = `${obj_result.c ? 'C' : 'L'}`;
     obj_result.total.TX = `${obj_result.t ? 'T' : 'X'}`;
     obj_result.total.XIEN = `${obj_result.total.CL}${obj_result.total.TX}`;
-    return `${obj_result.total.XIEN}_${res}`;
+    return `${obj_result.total.XIEN}_${result}`;
   }
 
   generateResult() {
@@ -611,10 +611,10 @@ export class MiddleEventService {
           if (isRes % 2 !== 0 && place === 'L') {
             isWinner = true;
           }
-          if (isRes < 5 && place === 'X') {
+          if (isRes <= 4 && place === 'X') {
             isWinner = true;
           }
-          if (isRes > 4 && place === 'T') {
+          if (isRes >= 5 && place === 'T') {
             isWinner = true;
           }
         } else if (typeBet === 'x') {
