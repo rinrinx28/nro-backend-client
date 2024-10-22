@@ -158,11 +158,14 @@ export class MiddleEventService {
           let isRes = parseInt(res.result, 10);
           if (isRes % 2 === 0 && place === 'C') {
             isWinner = true;
-          } else if (isRes % 2 !== 0 && place === 'L') {
+          }
+          if (isRes % 2 !== 0 && place === 'L') {
             isWinner = true;
-          } else if (isRes < 5 && place === 'X') {
+          }
+          if (isRes < 5 && place === 'X') {
             isWinner = true;
-          } else {
+          }
+          if (isRes > 4 && place === 'T') {
             isWinner = true;
           }
         } else if (typeBet === 'x') {
@@ -602,11 +605,14 @@ export class MiddleEventService {
           let isRes = parseInt(result, 10);
           if (isRes % 2 === 0 && place === 'C') {
             isWinner = true;
-          } else if (isRes % 2 !== 0 && place === 'L') {
+          }
+          if (isRes % 2 !== 0 && place === 'L') {
             isWinner = true;
-          } else if (isRes < 5 && place === 'X') {
+          }
+          if (isRes < 5 && place === 'X') {
             isWinner = true;
-          } else {
+          }
+          if (isRes > 4 && place === 'T') {
             isWinner = true;
           }
         } else if (typeBet === 'x') {
