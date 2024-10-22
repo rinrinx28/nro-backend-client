@@ -103,7 +103,7 @@ export class MiddleEventService {
       // Fisrt time run system or out range time end!
       if (!old_game) {
         let old_r_game = await this.resultMiniGameModel
-          .find({ server: '24' })
+          .find()
           .sort({ updatedAt: -1 })
           .limit(10);
         let n_game = await this.handlerCreate({
