@@ -545,6 +545,14 @@ export class MiddleEventService {
             // this.logger.log('Minigame Client: Data not match ... create new');
           }
           return;
+        } else {
+          // Create new game
+          await this.CreateNewMiniGame({
+            server: data.server,
+            uuid: data.uuid,
+            lastResult: numbers.join('-'),
+            timeEnd: this.addSeconds(new Date(), remainingTime),
+          });
         }
       }
     } catch (err: any) {
