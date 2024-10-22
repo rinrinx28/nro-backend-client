@@ -372,28 +372,44 @@ export class MiddleEventService {
   //TODO ———————————————[Handler notice info]———————————————
   parseContent(content: string) {
     try {
-      // Sử dụng biểu thức chính quy để lấy kết quả giải trước, dãy số và thời gian còn lại
-      const regex =
-        /Kết quả giải trước: (\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
-      const match = content.match(regex);
-      if (match) {
-        const result = parseInt(match[1], 10);
-        const numbers = match[2]
-          .split(',')
-          .map((num) => num.trim())
-          .flatMap((s) => s.split('\b')) // Sử dụng flatMap thay vì map để tránh mảng lồng nhau
-          .filter((f) => f && f.length > 0) // Loại bỏ các ký tự trống và undefined
-          .reverse(); // Lấy dãy số sau ký tự \b
+      // Tìm dãy số liên tiếp theo định dạng "số,số,số,..."
+      const numberPattern = /\d{2}(?:,\d{2})+/g;
+      const secondsPattern = /<(\d+)> giây/g;
 
-        const remainingTime = parseInt(match[3], 10);
-
-        // Kết hợp mảng số thành chuỗi
-        const numbersString = numbers.join('-');
-
-        return { result, numbers, numbersString, remainingTime };
+      const numbers = content.match(numberPattern);
+      const seconds = content
+        .match(secondsPattern)
+        ?.map((s) => s.match(/\d+/)?.[0]);
+      if (numbers && seconds) {
+        // Trích xuất dãy số và giây
+        return {
+          numbers: numbers || [],
+          remainingTime: parseInt(seconds[0], 10) || 0,
+        };
       }
-
       return null;
+      // Sử dụng biểu thức chính quy để lấy kết quả giải trước, dãy số và thời gian còn lại
+      // const regex =
+      //   /Kết quả giải trước: (\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
+      // const match = content.match(regex);
+      // if (match) {
+      //   const result = parseInt(match[1], 10);
+      //   const numbers = match[2]
+      //     .split(',')
+      //     .map((num) => num.trim())
+      //     .flatMap((s) => s.split('\b')) // Sử dụng flatMap thay vì map để tránh mảng lồng nhau
+      //     .filter((f) => f && f.length > 0) // Loại bỏ các ký tự trống và undefined
+      //     .reverse(); // Lấy dãy số sau ký tự \b
+
+      //   const remainingTime = parseInt(match[3], 10);
+
+      //   // Kết hợp mảng số thành chuỗi
+      //   const numbersString = numbers.join('-');
+
+      //   return { result, numbers, numbersString, remainingTime };
+      // }
+
+      // return null;
     } catch (err: any) {
       console.log(err);
     }
@@ -413,11 +429,10 @@ export class MiddleEventService {
       const parsedContent = this.parseContent(data.content);
 
       if (!parsedContent) {
-        // this.logger.log('Failed to parse content:', data.content);
         return;
       }
 
-      const { result, numbers, remainingTime } = parsedContent;
+      const { numbers, remainingTime } = parsedContent;
 
       const latestSession = await this.miniGameModel
         .findOne({ server: data.server, isEnd: false })
