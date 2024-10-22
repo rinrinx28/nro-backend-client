@@ -445,6 +445,8 @@ export class MiddleEventService {
 
       const { numbers, remainingTime } = parsedContent;
 
+      console.log(numbers);
+
       const latestSession = await this.miniGameModel
         .findOne({ server: data.server, isEnd: false })
         .sort({ updatedAt: -1 });
