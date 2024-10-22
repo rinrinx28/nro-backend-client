@@ -102,7 +102,7 @@ export class MiddleEventService {
         .sort({ updatedAt: -1 });
       // Fisrt time run system or out range time end!
       if (!old_game) {
-        let old_r_game = await this.miniGameModel
+        let old_r_game = await this.resultMiniGameModel
           .find({ server: '24' })
           .sort({ updatedAt: -1 })
           .limit(10);
@@ -290,8 +290,8 @@ export class MiddleEventService {
       }
 
       // Create new Bet 24
-      const last_res = await this.miniGameModel
-        .find({ server: '24' })
+      const last_res = await this.resultMiniGameModel
+        .find()
         .sort({ updatedAt: -1 })
         .limit(10);
       const n_game = await this.handlerCreate({
@@ -444,6 +444,7 @@ export class MiddleEventService {
       }
 
       const { numbers, remainingTime } = parsedContent;
+      console.log(numbers);
 
       const latestSession = await this.miniGameModel
         .findOne({ server: data.server, isEnd: false })
