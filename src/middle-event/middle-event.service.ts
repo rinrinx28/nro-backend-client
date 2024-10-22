@@ -229,7 +229,7 @@ export class MiddleEventService {
 
           // Cập nhật điểm cho clan nếu có clanId
           if (clanId) {
-            user.meta.totalScore += revice; // Cập nhật tổng điểm của user
+            user.meta.score += revice; // Cập nhật tổng điểm của user
             let clan = clans.findIndex((c) => c.clanId === clanId);
             if (clan < 0) {
               clans.push({ clanId, score: revice });
@@ -676,7 +676,7 @@ export class MiddleEventService {
 
           // Cập nhật điểm cho clan nếu có clanId
           if (clanId) {
-            user.meta.totalScore += revice; // Cập nhật tổng điểm của user
+            user.meta.score += revice; // Cập nhật tổng điểm của user
             let clan = clans.findIndex((c) => c.clanId === clanId);
             if (clan < 0) {
               clans.push({ clanId, score: revice });

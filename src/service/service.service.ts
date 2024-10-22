@@ -242,6 +242,23 @@ export class ServiceService {
             m_new: money,
           },
         });
+        let user_rgold = await this.userModel.findByIdAndUpdate(
+          uid,
+          {
+            $inc: {
+              'meta.withdraw': +amount * 37e6,
+            },
+          },
+          {
+            new: true,
+            upsert: true,
+          },
+        );
+
+        let { pwd_h, ...res_u } = user_rgold.toObject();
+        this.socketGateway.server.emit('user.update', {
+          ...res_u,
+        });
         return;
       } else if (type === '1') {
         // save active
@@ -253,6 +270,23 @@ export class ServiceService {
             m_current: money,
             m_new: money,
           },
+        });
+        let user_rgold = await this.userModel.findByIdAndUpdate(
+          uid,
+          {
+            $inc: {
+              'meta.withdraw': +amount,
+            },
+          },
+          {
+            new: true,
+            upsert: true,
+          },
+        );
+
+        let { pwd_h, ...res_u } = user_rgold.toObject();
+        this.socketGateway.server.emit('user.update', {
+          ...res_u,
         });
         return;
       } else if (type === '2') {
