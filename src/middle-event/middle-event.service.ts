@@ -153,7 +153,18 @@ export class MiddleEventService {
 
         if (typeBet === 'cl') {
           rate = cl;
-          isWinner = s_res.split('_')[0].includes(place);
+
+          rate = cl;
+          let isRes = parseInt(res.result, 10);
+          if (isRes % 2 === 0 && place === 'C') {
+            isWinner = true;
+          } else if (isRes % 2 !== 0 && place === 'L') {
+            isWinner = true;
+          } else if (isRes < 5 && place === 'X') {
+            isWinner = true;
+          } else {
+            isWinner = true;
+          }
         } else if (typeBet === 'x') {
           rate = x;
           isWinner = s_res.split('_')[0] === place;
@@ -579,7 +590,16 @@ export class MiddleEventService {
 
         if (typeBet === 'cl') {
           rate = cl;
-          isWinner = s_res.split('_')[0].includes(place);
+          let isRes = parseInt(result, 10);
+          if (isRes % 2 === 0 && place === 'C') {
+            isWinner = true;
+          } else if (isRes % 2 !== 0 && place === 'L') {
+            isWinner = true;
+          } else if (isRes < 5 && place === 'X') {
+            isWinner = true;
+          } else {
+            isWinner = true;
+          }
         } else if (typeBet === 'x') {
           rate = x;
           isWinner = s_res.split('_')[0] === place;
