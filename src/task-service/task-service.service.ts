@@ -8,6 +8,6 @@ export class TasksService {
   // Cron job: Executes at the 45th second of every minute
   @Cron('0 */1 * * * *')
   handlerMiniServer() {
-    // this.emitEvent2.emitAsync('mini.server.24', 'run');
+    this.emitEvent2.emitAsync('mini.server.24', 'run');
   }
 }
