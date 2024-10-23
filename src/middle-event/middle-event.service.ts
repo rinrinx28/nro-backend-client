@@ -417,7 +417,7 @@ export class MiddleEventService {
       let store_user_winer: { uid: string; score: number; precent?: number }[] =
         [];
       for (const user of user_bet_winer) {
-        let index = store_user_winer.findIndex((u) => u.uid === user.id);
+        let index = store_user_winer.findIndex((u) => u?.uid === user.uid);
         if (index < 0) {
           store_user_winer.push({
             uid: user.id,
