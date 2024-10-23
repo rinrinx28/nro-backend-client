@@ -603,7 +603,7 @@ export class MiddleEventService {
         if (typeBet === 'cl') {
           rate = cl;
           let new_res =
-            `${parseInt(result, 10) > 9 ? result : `0${result}`}`[1];
+          `${parseInt(result, 10) > 9 ? result : `0${result}`}`[1];
           let isRes = parseInt(new_res, 10);
           if (isRes % 2 === 0 && place === 'C') {
             isWinner = true;
