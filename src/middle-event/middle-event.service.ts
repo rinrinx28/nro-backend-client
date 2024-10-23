@@ -413,7 +413,7 @@ export class MiddleEventService {
       );
 
       // Config Jackpot;
-      const prizes = jackpot.score * 0.5;
+      const prizes = jackpot.score * 0.05;
       let store_user_winer: { uid: string; score: number; precent?: number }[] =
         [];
       for (const user of user_bet_winer) {
