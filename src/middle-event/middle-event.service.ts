@@ -15,6 +15,7 @@ import { Bot } from 'src/bot/schema/bot.schema';
 import { Clan } from './schema/clan.schema';
 import { Mutex } from 'async-mutex';
 import * as moment from 'moment';
+import { Jackpot } from './schema/jackpot';
 
 interface IData {
   uuid: string;
@@ -44,6 +45,8 @@ export class MiddleEventService {
     private readonly botModel: Model<Bot>,
     @InjectModel(Clan.name)
     private readonly clanModel: Model<Clan>,
+    @InjectModel(Jackpot.name)
+    private readonly JackpotModel: Model<Jackpot>,
   ) {}
   private logger: Logger = new Logger('Middle Handler');
   private readonly mutexMap = new Map<string, Mutex>();
@@ -291,7 +294,10 @@ export class MiddleEventService {
           uid: 'local',
         });
       }
-
+      // Send jackpot:
+      if (res.result === '99') {
+        await this.sendJackpot({ server: '24', betId: old_game.id });
+      }
       // Create new Bet 24
       const last_res = await this.resultMiniGameModel
         .find()
@@ -381,6 +387,108 @@ export class MiddleEventService {
   }) {
     const msg = await this.messageModel.create(payload);
     this.socketGateway.server.emit('message-re', msg);
+  }
+
+  //TODO ———————————————[Jackpot Sv 24]———————————————
+  async sendJackpot(payload: { server: string; betId: string }) {
+    try {
+      const { server, betId } = payload;
+      // Find jackpot;
+      const jackpot = await this.JackpotModel.findOne({ server });
+      if (!jackpot) throw new Error('');
+
+      // Find all userBet;
+      const userBets = await this.userBetModel.find({
+        betId: betId,
+        status: 2,
+        isEnd: true,
+        server: '24',
+      });
+
+      // filter userbet is winer;
+      const user_bet_winer = userBets.filter((u) => u.revice > 0);
+      const total_bet_winer = userBets.reduce(
+        (sum, b) => sum + (b.amount ?? 0),
+        0,
+      );
+
+      // Config Jackpot;
+      const prizes = jackpot.score * 0.5;
+      let store_user_winer: { uid: string; score: number; precent?: number }[] =
+        [];
+      for (const user of user_bet_winer) {
+        let index = store_user_winer.findIndex((u) => u.uid === user.id);
+        if (index < 0) {
+          store_user_winer.push({
+            uid: user.id,
+            score: user.amount,
+          });
+        } else {
+          store_user_winer[index].score += user.amount;
+        }
+      }
+
+      // Find percent of user;
+      for (let i = 0; i < store_user_winer.length; i++) {
+        let percent = total_bet_winer / store_user_winer[i].score;
+        store_user_winer[i].precent = percent;
+      }
+
+      let list_u_up = store_user_winer.map((s) => {
+        return this.userModel.findByIdAndUpdate(s.uid, {
+          $inc: {
+            money: +s.precent * prizes,
+          },
+        });
+      });
+
+      const updateUsers = await Promise.all(list_u_up);
+
+      let list_u_active = updateUsers.map((up) => {
+        let winer_u = store_user_winer.find((u) => u.uid === up.id);
+        let m_current = up.money - winer_u.precent * prizes;
+        let m_new = up.money;
+        return this.userActiveModel.create({
+          uid: up.id,
+          active: {
+            name: 'win_jackpot',
+            m_current,
+            m_new,
+          },
+        });
+      });
+
+      await Promise.all(list_u_active);
+
+      let res_u_s = updateUsers.map((up) => {
+        let { _id, money, meta } = up.toObject();
+        return { _id, money, meta };
+      });
+
+      let list_notice_u = updateUsers.map((up) => {
+        let winer_u = store_user_winer.find((u) => u.uid === up.id);
+        let prize = winer_u.precent * prizes;
+        return `Nguời chơi ${up.name} đã trúng Jackpot ${new Intl.NumberFormat('vi').format(prize)} vàng`;
+      });
+
+      if (list_notice_u.length > 0) {
+        await this.sendNotiSystem({
+          content:
+            'Xin chúc mừng những người chơi sau:\n' + list_notice_u.join('\n'),
+          server: 'all',
+          uid: 'local',
+        });
+      }
+      this.socketGateway.server.emit('user.update.bulk', res_u_s);
+
+      // Save Jackpot;
+      jackpot.score -= prizes;
+      await jackpot.save();
+      this.socketGateway.server.emit('jackpot.update', jackpot.toObject());
+      this.logger.log('Send prizes Jackpot is Success!');
+    } catch (err: any) {
+      this.logger.log(`Err Jackpot: ${err.message}`);
+    }
   }
 
   //TODO ———————————————[Handler notice info]———————————————
@@ -603,7 +711,7 @@ export class MiddleEventService {
         if (typeBet === 'cl') {
           rate = cl;
           let new_res =
-          `${parseInt(result, 10) > 9 ? result : `0${result}`}`[1];
+            `${parseInt(result, 10) > 9 ? result : `0${result}`}`[1];
           let isRes = parseInt(new_res, 10);
           if (isRes % 2 === 0 && place === 'C') {
             isWinner = true;
