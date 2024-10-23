@@ -394,6 +394,7 @@ export class MiddleEventService {
     try {
       const { server, betId } = payload;
       // Find jackpot;
+      const e_bet = await this.eConfigModel.findOne({ name: 'e_bet' });
       const jackpot = await this.JackpotModel.findOne({ server });
       if (!jackpot) throw new Error('');
 
@@ -407,13 +408,12 @@ export class MiddleEventService {
 
       // filter userbet is winer;
       const user_bet_winer = userBets.filter((u) => u.revice > 0);
-      const total_bet_winer = userBets.reduce(
-        (sum, b) => sum + (b.amount ?? 0),
-        0,
-      );
+      const total_bet_winer = userBets
+        .filter((u) => u.revice > 0)
+        .reduce((sum, b) => sum + (b.amount ?? 0), 0);
 
       // Config Jackpot;
-      const prizes = jackpot.score * 0.05;
+      const prizes = jackpot.score * (e_bet.option.jackpot ?? 0.05);
       let store_user_winer: { uid: string; score: number; precent?: number }[] =
         [];
       for (const user of user_bet_winer) {
