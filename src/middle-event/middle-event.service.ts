@@ -420,7 +420,7 @@ export class MiddleEventService {
         let index = store_user_winer.findIndex((u) => u?.uid === user.uid);
         if (index < 0) {
           store_user_winer.push({
-            uid: user.id,
+            uid: user.uid,
             score: user.amount,
           });
         } else {
