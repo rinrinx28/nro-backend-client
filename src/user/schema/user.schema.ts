@@ -38,7 +38,7 @@ export class User {
       vipStartDate: null,
       vipExpiryDate: null,
       rewardCollected: false,
-      rewardDayCollected: false,
+      rewardDayCollected: [],
     },
     type: SchemaTypes.Mixed,
   })
