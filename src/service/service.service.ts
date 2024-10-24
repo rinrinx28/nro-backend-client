@@ -6,6 +6,7 @@ import { User } from 'src/user/schema/user.schema';
 import { UserActive } from 'src/user/schema/userActive.schema';
 import { SocketGateway } from 'src/socket/socket.gateway';
 import { EConfig } from 'src/middle-event/schema/config.schema';
+import * as moment from 'moment';
 
 interface UpdateService {
   id: string;
@@ -308,6 +309,8 @@ export class ServiceService {
 
         let { pwd_h, ...res_u } = user_rgold.toObject();
 
+        await this.addDiamon(uid, deposit_rgold);
+
         await this.userActiveModel.create({
           uid: uid,
           active: {
@@ -320,6 +323,7 @@ export class ServiceService {
         this.socketGateway.server.emit('user.update', {
           ...res_u,
         });
+        await this.addVip(res_u._id.toString());
         return;
       } else {
         let user_gold = await this.userModel.findByIdAndUpdate(
@@ -337,6 +341,7 @@ export class ServiceService {
           },
         );
         let { pwd_h, ...res_u } = user_gold.toObject();
+        await this.addDiamon(uid, amount);
 
         await this.userActiveModel.create({
           uid: uid,
@@ -350,8 +355,85 @@ export class ServiceService {
         this.socketGateway.server.emit('user.update', {
           ...res_u,
         });
+        await this.addVip(res_u._id.toString());
         return;
       }
+    }
+  }
+
+  // Add VIP
+  async addVip(userId: string) {
+    try {
+      const user = await this.userModel.findById(userId);
+      const e_reward = await this.EConfigModel.findOne({ name: 'e_reward' });
+
+      if (!user || !e_reward) {
+        throw new Error('User or reward config not found');
+      }
+
+      const { vipLevels } = e_reward.option;
+      const { totalScore, vip, vipStartDate } = user.meta;
+
+      // Tìm cấp VIP mới mà người dùng có thể đạt được
+      const nextVipLevel = vipLevels.find(
+        (level) => totalScore >= level.requiredPoints && vip < level.vipLevel,
+      );
+
+      if (nextVipLevel) {
+        const { vipLevel } = nextVipLevel;
+
+        if (user.meta.vip !== vipLevel) {
+          // Cập nhật cấp độ VIP mới
+          user.meta.vip = vipLevel;
+
+          // Nếu chưa có ngày bắt đầu VIP, thiết lập ngày hiện tại
+          if (!vipStartDate) {
+            user.meta.vipStartDate = new Date();
+            user.meta.vipExpiryDate = moment(user.meta.vipStartDate)
+              .add(30, 'days')
+              .toDate(); // Đảm bảo .toDate() để lưu vào MongoDB
+          }
+          // Đánh dấu meta đã thay đổi
+          user.markModified('meta');
+          await user.save();
+
+          // Update active
+          await this.userActiveModel.create({
+            uid: userId,
+            active: {
+              name: 'upgrade_vip',
+              m_current: user.money,
+              m_new: user.money,
+              v_current: vip,
+              v_new: nextVipLevel,
+            },
+          });
+          // Emit cập nhật người dùng qua WebSocket
+          const { pwd_h, ...res_u } = user.toObject(); // Loại bỏ thông tin nhạy cảm trước khi gửi
+          this.socketGateway.server.emit('user.update', res_u);
+        }
+      }
+    } catch (err: any) {
+      this.logger.log(`Err Set VIP User: ${err.message}`);
+    }
+  }
+
+  async addDiamon(userId: string, amount: number) {
+    try {
+      const e_reward = await this.EConfigModel.findOne({ name: 'e_reward' });
+      const user = await this.userModel.findById(userId);
+
+      if (!user || !e_reward) {
+        throw new Error('User or reward config not found');
+      }
+      const { diamon } = e_reward.option;
+      let v_diamon = amount / diamon;
+      user.diamon += v_diamon;
+      await user.save();
+      const { pwd_h, ...res_u } = user.toObject();
+      this.socketGateway.server.emit('user.update', res_u);
+    } catch (err: any) {
+      this.logger.log(`Err Add Diamon User: ${err.message}`);
     }
   }
 }

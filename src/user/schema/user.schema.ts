@@ -19,6 +19,9 @@ export class User {
   @Prop({ default: 0 })
   money: number;
 
+  @Prop({ default: 0 })
+  diamon: number;
+
   @Prop({ default: '' })
   email: string;
 
@@ -32,6 +35,10 @@ export class User {
       totalScore: 0,
       avatar: null,
       vip: 0,
+      vipStartDate: null,
+      vipExpiryDate: null,
+      rewardCollected: false,
+      rewardDayCollected: false,
     },
     type: SchemaTypes.Mixed,
   })
