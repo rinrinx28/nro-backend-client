@@ -374,17 +374,22 @@ export class ServiceService {
       const { vipLevels } = e_reward.option;
       const { totalScore, vip, vipStartDate } = user.meta;
 
-      // Tìm cấp VIP mới mà người dùng có thể đạt được
-      const nextVipLevel = vipLevels.find(
-        (level) => totalScore >= level.requiredPoints && vip < level.vipLevel,
+      // Tìm tất cả các cấp VIP mà người dùng có thể đạt được
+      const eligibleVipLevels = vipLevels.filter(
+        (level) => totalScore >= level.requiredPoints,
       );
 
-      if (nextVipLevel) {
-        const { vipLevel } = nextVipLevel;
+      // Nếu có cấp độ VIP nào phù hợp, lấy cấp độ cao nhất
+      const nextVipLevel = eligibleVipLevels.length
+        ? eligibleVipLevels[eligibleVipLevels.length - 1]
+        : null;
 
-        if (user.meta.vip !== vipLevel) {
+      if (nextVipLevel) {
+        const { level } = nextVipLevel;
+
+        if (user.meta.vip !== level) {
           // Cập nhật cấp độ VIP mới
-          user.meta.vip = vipLevel;
+          user.meta.vip = level;
 
           // Nếu chưa có ngày bắt đầu VIP, thiết lập ngày hiện tại
           if (!vipStartDate) {
