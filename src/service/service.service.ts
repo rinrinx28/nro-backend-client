@@ -163,7 +163,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'w_rgold',
+            name: 'w_c_rgold',
             status: typeUpdate,
             m_current: res_u.money - refund_money_rgold,
             m_new: res_u.money,
@@ -195,7 +195,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'w_gold',
+            name: 'w_c_gold',
             status: typeUpdate,
             m_current: res_u.money - amount,
             m_new: res_u.money,
@@ -209,7 +209,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'd_rgold',
+            name: 'd_c_rgold',
             status: typeUpdate,
             m_current: money,
             m_new: money,
@@ -220,7 +220,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'd_gold',
+            name: 'd_c_rgold',
             status: typeUpdate,
             m_current: money,
             m_new: money,
@@ -314,7 +314,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'd_rgold',
+            name: 'd_s_rgold',
             status: typeUpdate,
             m_current: res_u.money - deposit_rgold,
             m_new: res_u.money,
@@ -346,7 +346,7 @@ export class ServiceService {
         await this.userActiveModel.create({
           uid: uid,
           active: {
-            name: 'd_gold',
+            name: 'd_s_gold',
             status: typeUpdate,
             m_current: res_u.money - amount,
             m_new: res_u.money,
@@ -433,6 +433,16 @@ export class ServiceService {
       }
       const { diamon } = e_reward.option;
       let v_diamon = amount / diamon;
+
+      // save active
+      await this.userActiveModel.create({
+        uid: user.id,
+        active: {
+          name: 'upgrade_diamon',
+          d_current: user.diamon,
+          d_new: user.diamon + v_diamon,
+        },
+      });
       user.diamon += v_diamon;
       await user.save();
       const { pwd_h, ...res_u } = user.toObject();
