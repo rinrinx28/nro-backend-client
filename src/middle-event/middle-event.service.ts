@@ -555,21 +555,19 @@ export class MiddleEventService {
       }
 
       const { numbers, remainingTime } = parsedContent;
-      // console.log(numbers);
+      const serverQuery = { server: data.server };
 
+      // Tìm phiên gần nhất, bất kể là `isEnd: false` hay `isEnd: true`
       const latestSession = await this.miniGameModel
-        .findOne({ server: data.server, isEnd: false })
+        .findOne({ ...serverQuery, isEnd: false })
         .sort({ updatedAt: -1 });
+      let isNextSession = false;
 
       if (latestSession) {
+        // Nếu thời gian còn lại là 0, đánh dấu phiên đã kết thúc
         if (remainingTime === 0) {
-          // Mark current session as ended
           const updatedSession = await this.miniGameModel
-            .findByIdAndUpdate(
-              latestSession.id,
-              { isEnd: true },
-              { new: true, upsert: true },
-            )
+            .findByIdAndUpdate(latestSession.id, { isEnd: true }, { new: true })
             .exec();
           this.socketGateway.server.emit('mini.bet', {
             n_game: updatedSession.toObject(),
@@ -577,101 +575,66 @@ export class MiddleEventService {
           return;
         }
 
-        // Compare latest session result
-        if (
-          numbers[0] === latestSession.lastResult.split('-')[0] &&
-          numbers[1] === latestSession.lastResult.split('-')[1]
-        ) {
-          const timeDiff =
-            moment(`${latestSession.timeEnd}`).unix() - moment().unix();
-
-          if (timeDiff - remainingTime === 10) {
+        // So sánh kết quả phiên gần nhất
+        const [lastResult1, lastResult2] = latestSession.lastResult.split('-');
+        if (numbers[0] === lastResult1 && numbers[1] === lastResult2) {
+          if (remainingTime % 10 === 0) {
             const updatedSession = await this.miniGameModel
               .findByIdAndUpdate(
                 latestSession.id,
                 { timeEnd: this.addSeconds(new Date(), remainingTime) },
-                { new: true, upsert: true },
+                { new: true },
               )
               .exec();
-
             this.socketGateway.server.emit('mini.bet', {
               n_game: updatedSession.toObject(),
             });
-            return;
           }
-
-          // this.logger.log(
-          //   `Session updated: SID: ${latestSession.id} - LastResult: ${latestSession.lastResult} - RemainingTime: ${remainingTime}`,
-          // );
           return;
         }
-      } else {
-        // Handle old sessions
-        const oldSession = await this.miniGameModel
-          .findOne({ server: data.server, isEnd: true })
-          .sort({ updatedAt: -1 });
+      }
 
-        if (oldSession) {
-          if (remainingTime === 0) {
-            // this.logger.log(
-            //   `Valid data, continuing the session. ${remainingTime} - ${result} - ${numbers.join('-')}`,
-            // );
-            return;
-          }
+      // Xử lý phiên cũ nếu không có phiên hoạt động
+      const oldSession = await this.miniGameModel
+        .findOne({ ...serverQuery, isEnd: true })
+        .sort({ updatedAt: -1 });
 
-          // Check is next Session
+      if (oldSession) {
+        if (remainingTime === 0) return;
+        isNextSession =
+          numbers[1] === oldSession.lastResult.split('-')[0] &&
+          remainingTime === 280;
+
+        if (isNextSession) {
           oldSession.result = numbers[0];
-          if (numbers[1] === oldSession.lastResult.split('-')[0]) {
-            // Await to 280s
-            if (remainingTime === 280) {
-              // save result
-              await oldSession.save();
-              await this.givePrizesToWinerMiniGameClient({
-                betId: oldSession.id,
-                result: numbers[0],
-                server: data.server,
-              });
-              await this.CreateNewMiniGame({
-                server: data.server,
-                uuid: data.uuid,
-                lastResult: numbers.join('-'),
-                timeEnd: this.addSeconds(new Date(), remainingTime),
-              });
-              return;
-            }
-          } else if (remainingTime === 280) {
-            // save result
-            await oldSession.save();
-            await this.givePrizesToWinerMiniGameClient({
-              betId: oldSession.id,
-              result: numbers[0],
-              server: data.server,
-            });
-            await this.CreateNewMiniGame({
-              server: data.server,
-              uuid: data.uuid,
-              lastResult: numbers.join('-'),
-              timeEnd: this.addSeconds(new Date(), remainingTime),
-            });
-            // this.logger.log('Minigame Client: Data not match ... create new');
-          }
-          return;
-        } else {
-          // Create new game
+          await oldSession.save();
+          await this.givePrizesToWinerMiniGameClient({
+            betId: oldSession.id,
+            result: numbers[0],
+            server: data.server,
+          });
+
           await this.CreateNewMiniGame({
             server: data.server,
             uuid: data.uuid,
             lastResult: numbers.join('-'),
             timeEnd: this.addSeconds(new Date(), remainingTime),
           });
+          return;
         }
+      } else {
+        // Tạo phiên mới nếu không có phiên hoạt động nào
+        await this.CreateNewMiniGame({
+          server: data.server,
+          uuid: data.uuid,
+          lastResult: numbers.join('-'),
+          timeEnd: this.addSeconds(new Date(), remainingTime),
+        });
       }
     } catch (err: any) {
       this.logger.log(err);
     } finally {
       release();
-      // Giai phong map;
-      this.mutexMap.delete(parameter);
     }
   }
 
