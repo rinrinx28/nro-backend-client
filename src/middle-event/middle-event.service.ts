@@ -629,6 +629,7 @@ export class MiddleEventService {
               lastResult: numbers.join('-'),
               timeEnd: this.addSeconds(new Date(), remainingTime),
             });
+            return;
           }
         }
       } else {
