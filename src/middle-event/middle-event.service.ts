@@ -621,6 +621,13 @@ export class MiddleEventService {
             timeEnd: this.addSeconds(new Date(), remainingTime),
           });
           return;
+        } else {
+          await this.CreateNewMiniGame({
+            server: data.server,
+            uuid: data.uuid,
+            lastResult: numbers.join('-'),
+            timeEnd: this.addSeconds(new Date(), remainingTime),
+          });
         }
       } else {
         // Tạo phiên mới nếu không có phiên hoạt động nào
