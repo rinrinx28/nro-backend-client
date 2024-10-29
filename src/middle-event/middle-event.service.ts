@@ -622,12 +622,14 @@ export class MiddleEventService {
           });
           return;
         } else {
-          await this.CreateNewMiniGame({
-            server: data.server,
-            uuid: data.uuid,
-            lastResult: numbers.join('-'),
-            timeEnd: this.addSeconds(new Date(), remainingTime),
-          });
+          if (remainingTime === 280) {
+            await this.CreateNewMiniGame({
+              server: data.server,
+              uuid: data.uuid,
+              lastResult: numbers.join('-'),
+              timeEnd: this.addSeconds(new Date(), remainingTime),
+            });
+          }
         }
       } else {
         // Tạo phiên mới nếu không có phiên hoạt động nào
