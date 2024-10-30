@@ -165,10 +165,10 @@ export class MiddleEventService {
           if (isRes % 2 !== 0 && place === 'L') {
             isWinner = true;
           }
-          if (isRes <= 4 && place === 'X') {
+          if (isRes <= 49 && place === 'X') {
             isWinner = true;
           }
-          if (isRes >= 5 && place === 'T') {
+          if (isRes >= 50 && place === 'T') {
             isWinner = true;
           }
         } else if (typeBet === 'x') {
@@ -357,8 +357,8 @@ export class MiddleEventService {
     let obj_result = {
       c: parseInt(new_result, 10) % 2 === 0,
       l: parseInt(new_result, 10) % 2 !== 0,
-      x: parseInt(new_result, 10) < 5,
-      t: parseInt(new_result, 10) > 4,
+      x: parseInt(new_result, 10) < 50,
+      t: parseInt(new_result, 10) > 49,
       total: {
         CL: '',
         TX: '',
@@ -692,10 +692,10 @@ export class MiddleEventService {
           if (isRes % 2 !== 0 && place === 'L') {
             isWinner = true;
           }
-          if (isRes <= 4 && place === 'X') {
+          if (isRes <= 49 && place === 'X') {
             isWinner = true;
           }
-          if (isRes >= 5 && place === 'T') {
+          if (isRes >= 50 && place === 'T') {
             isWinner = true;
           }
         } else if (typeBet === 'x') {
