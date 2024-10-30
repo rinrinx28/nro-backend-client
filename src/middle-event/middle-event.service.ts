@@ -352,24 +352,23 @@ export class MiddleEventService {
   }
 
   showResult(res: string) {
-    let result = `${parseInt(res, 10) > 9 ? parseInt(res, 10) : `0${parseInt(res, 10)}`}`;
-    let new_result = `${result}`[1];
+    let new_result = parseInt(res, 10);
     let obj_result = {
-      c: parseInt(new_result, 10) % 2 === 0,
-      l: parseInt(new_result, 10) % 2 !== 0,
-      x: parseInt(new_result, 10) < 50,
-      t: parseInt(new_result, 10) > 49,
+      c: new_result % 2 === 0,
+      l: new_result % 2 !== 0,
+      x: new_result < 50,
+      t: new_result > 49,
       total: {
         CL: '',
         TX: '',
-        result: `${result}`,
+        result: `${new_result}`,
         XIEN: '',
       },
     };
     obj_result.total.CL = `${obj_result.c ? 'C' : 'L'}`;
     obj_result.total.TX = `${obj_result.t ? 'T' : 'X'}`;
     obj_result.total.XIEN = `${obj_result.total.CL}${obj_result.total.TX}`;
-    return `${obj_result.total.XIEN}_${result}`;
+    return `${obj_result.total.XIEN}_${new_result}`;
   }
 
   generateResult() {
