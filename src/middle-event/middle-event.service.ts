@@ -156,9 +156,7 @@ export class MiddleEventService {
 
         if (typeBet === 'cl') {
           rate = cl;
-          let new_res =
-            `${parseInt(res.result, 10) > 9 ? res.result : `0${res.result}`}`[1];
-          let isRes = parseInt(new_res, 10);
+          let isRes = parseInt(res.result, 10);
           if (isRes % 2 === 0 && place === 'C') {
             isWinner = true;
           }
@@ -682,9 +680,7 @@ export class MiddleEventService {
 
         if (typeBet === 'cl') {
           rate = cl;
-          let new_res =
-            `${parseInt(result, 10) > 9 ? parseInt(result, 10) : `0${parseInt(result, 10)}`}`[1];
-          let isRes = parseInt(new_res, 10);
+          let isRes = parseInt(result, 10);
           if (isRes % 2 === 0 && place === 'C') {
             isWinner = true;
           }
