@@ -25,6 +25,9 @@ export class User {
   @Prop({ default: '' })
   email: string;
 
+  @Prop({ default: '0' })
+  role: string;
+
   @Prop({
     default: {
       totalTrade: 0,
