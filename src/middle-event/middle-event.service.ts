@@ -620,6 +620,14 @@ export class MiddleEventService {
           return;
         } else {
           if (remainingTime === 280) {
+            // Save
+            let old_result = oldSession.result;
+            if (old_result.length === 0) {
+              await this.cancelBetMinigame({
+                betId: oldSession.id,
+                server: data.server,
+              });
+            }
             await this.CreateNewMiniGame({
               server: data.server,
               uuid: data.uuid,
@@ -825,6 +833,77 @@ export class MiddleEventService {
       this.socketGateway.server.emit('clan.update.bulk', clans_bulk);
     } catch (err: any) {
       this.logger.log('Err Give Prizes Winer MiniGame Client: ', err.message);
+    }
+  }
+
+  async cancelBetMinigame(payload: { betId: string; server: string }) {
+    try {
+      const { betId, server } = payload;
+      const old_game = await this.miniGameModel.findById(betId);
+      // Find all userbet not end
+      const userBets = await this.userBetModel.find({
+        betId: betId,
+        isEnd: false,
+        server: server,
+      });
+      let list_user: { uid: string; refund: number; userBetId: string }[] = [];
+      let update_userbets = [];
+
+      // save userbet
+      for (const ubet of userBets) {
+        let index_user = list_user.findIndex((u) => u.uid === ubet.uid);
+        if (index_user > -1) {
+          list_user.push({
+            uid: ubet.uid,
+            refund: ubet.amount,
+            userBetId: ubet.id,
+          });
+        } else {
+          list_user[index_user].refund += ubet.amount;
+        }
+        // save ubet;
+        ubet.isEnd = true;
+        await ubet.save();
+        update_userbets.push(ubet.toObject());
+      }
+
+      // Get find all user was bet
+      const users = await this.userModel.find({
+        _id: {
+          $in: list_user.map((u) => u.uid),
+        },
+      });
+
+      let update_user = [];
+      // refund money and save user, active
+      for (const user of users) {
+        let target = list_user.find((u) => u.uid === user.id);
+        if (target) {
+          // save active
+          await this.userActiveModel.create({
+            uid: target.uid,
+            active: {
+              name: 'cancel_bet',
+              userBetId: target.userBetId,
+              m_current: user.money,
+              m_new: user.money + target.refund,
+            },
+          });
+          user.money += target.refund;
+          await user.save();
+          const { pwd_h, email, ...res } = user.toObject();
+          update_user.push(res);
+        }
+      }
+
+      const payload_socket = {
+        n_game: old_game.toObject(),
+        userBets: update_userbets,
+        data_user: update_user,
+      };
+      this.socketGateway.server.emit('mini.bet', payload_socket);
+    } catch (err: any) {
+      this.logger.log('Err Cancel MiniGame Client: ', err.message);
     }
   }
 
