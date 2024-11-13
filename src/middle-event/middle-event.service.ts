@@ -489,49 +489,54 @@ export class MiddleEventService {
   }
 
   //TODO ———————————————[Handler notice info]———————————————
-  parseContent(content: string) {
-    try {
-      // Tìm dãy số liên tiếp theo định dạng "số,số,số,..."
-      const numberPattern = /\d{2}(?:,\d{2})+/g;
-      const secondsPattern = /<(\d+)> giây/g;
+  extractValues(input: string) {
+    // Loại bỏ các ký tự đặc biệt (bao gồm cả các ký tự điều khiển và ký tự không in được)
+    const cleanedInput = input.replace(/[^\w\s.]/g, ' ').trim();
 
-      const numbers = content.match(numberPattern);
-      const seconds = content
-        .match(secondsPattern)
-        ?.map((s) => s.match(/\d+/)?.[0]);
-      if (numbers && seconds) {
-        // Trích xuất dãy số và giây
-        return {
-          numbers: numbers[0].split(',').reverse() || [],
-          remainingTime: parseInt(seconds[0], 10) || 0,
-        };
+    // Tách chuỗi thành các từ dựa trên khoảng trắng
+    const words = cleanedInput.split(/\s+/);
+
+    // Mảng lưu trữ các số tìm được
+    const numbers: string[] = [];
+
+    // Duyệt qua các từ để tìm các số
+    for (let word of words) {
+      // Kiểm tra xem từ có phải là số có dấu chấm phân cách ngàn
+      if (/^\d{1,3}(\.\d{3})*$/.test(word)) {
+        numbers.push(word);
       }
-      return null;
-      // Sử dụng biểu thức chính quy để lấy kết quả giải trước, dãy số và thời gian còn lại
-      // const regex =
-      //   /Kết quả giải trước: (\d+)\b(.*?)\bTổng giải thưởng:.*?<(\d+)>\s*giây/;
-      // const match = content.match(regex);
-      // if (match) {
-      //   const result = parseInt(match[1], 10);
-      //   const numbers = match[2]
-      //     .split(',')
-      //     .map((num) => num.trim())
-      //     .flatMap((s) => s.split('\b')) // Sử dụng flatMap thay vì map để tránh mảng lồng nhau
-      //     .filter((f) => f && f.length > 0) // Loại bỏ các ký tự trống và undefined
-      //     .reverse(); // Lấy dãy số sau ký tự \b
-
-      //   const remainingTime = parseInt(match[3], 10);
-
-      //   // Kết hợp mảng số thành chuỗi
-      //   const numbersString = numbers.join('-');
-
-      //   return { result, numbers, numbersString, remainingTime };
-      // }
-
-      // return null;
-    } catch (err: any) {
-      console.log(err);
     }
+
+    let number_filter = numbers.filter((n) => n !== '90.000.000');
+    let result = this.processNumbers(number_filter);
+
+    return result;
+  }
+
+  processNumbers(numbers: string[]): {
+    result: string | null;
+    values: string[];
+    seconds: number | null;
+  } {
+    let result: string | null = null;
+    let values: string[] = [];
+    let seconds: number | null = null;
+
+    if (numbers.length === 1) {
+      // Nếu mảng chỉ có 1 số, đó chính là "giây"
+      seconds = parseInt(numbers[0], 10);
+    } else if (numbers.length > 1) {
+      // Nếu mảng có nhiều hơn 1 số
+      seconds = parseInt(numbers[numbers.length - 1], 10); // Giá trị cuối cùng là "giây"
+
+      // Đảo ngược các giá trị giữa đầu và cuối mảng
+      values = numbers.slice(0, numbers.length - 1).reverse();
+
+      // Lấy giá trị cuối cùng trong mảng đảo ngược làm "kết quả trước"
+      result = values[values.length - 1];
+    }
+
+    return { result, values, seconds };
   }
 
   async miniGameClient(data: IData) {
@@ -545,16 +550,23 @@ export class MiddleEventService {
     const mutex = this.mutexMap.get(parameter);
     const release = await mutex.acquire();
     try {
-      const parsedContent = this.parseContent(data.content);
+      const parsedContent = this.extractValues(data.content);
 
       if (!parsedContent) {
         return;
       }
 
-      const { numbers, remainingTime } = parsedContent;
+      const { result, seconds, values } = parsedContent;
       const serverQuery = { server: data.server };
 
-      // Tìm phiên gần nhất, bất kể là `isEnd: false` hay `isEnd: true`
+      // Bỏ qua result = null
+      if (!result) {
+        this.logger.log(
+          `Skip First BET - Server: ${data.server} - Result: ${result} - Values: ${values}`,
+        );
+      }
+
+      // Tìm phiên đang hoạt động gần nhất
       const latestSession = await this.miniGameModel
         .findOne({ ...serverQuery, isEnd: false })
         .sort({ updatedAt: -1 });
@@ -562,7 +574,7 @@ export class MiddleEventService {
 
       if (latestSession) {
         // Nếu thời gian còn lại là 0, đánh dấu phiên đã kết thúc
-        if (remainingTime === 0) {
+        if (seconds === 0) {
           const updatedSession = await this.miniGameModel
             .findByIdAndUpdate(latestSession.id, { isEnd: true }, { new: true })
             .exec();
@@ -572,78 +584,84 @@ export class MiddleEventService {
           return;
         }
 
-        // So sánh kết quả phiên gần nhất
-        const [lastResult1, lastResult2] = latestSession.lastResult.split('-');
-        if (numbers[0] === lastResult1 && numbers[1] === lastResult2) {
-          if (remainingTime % 10 === 0) {
-            const updatedSession = await this.miniGameModel
-              .findByIdAndUpdate(
-                latestSession.id,
-                { timeEnd: this.addSeconds(new Date(), remainingTime) },
-                { new: true },
-              )
-              .exec();
-            this.socketGateway.server.emit('mini.bet', {
-              n_game: updatedSession.toObject(),
-            });
-          }
+        // Cập nhật phiên hiện tại
+        if (seconds % 10 === 0) {
+          const updatedSession = await this.miniGameModel
+            .findByIdAndUpdate(
+              latestSession.id,
+              {
+                timeEnd: this.addSeconds(new Date(), seconds),
+                result: result ?? '',
+                lastResult: values,
+              },
+              { new: true },
+            )
+            .exec();
+          this.socketGateway.server.emit('mini.bet', {
+            n_game: updatedSession.toObject(),
+          });
           return;
         }
       }
 
-      // Xử lý phiên cũ nếu không có phiên hoạt động
+      // Xử lý phiên cũ gần nhất nếu không có phiên hoạt động
       const oldSession = await this.miniGameModel
         .findOne({ ...serverQuery, isEnd: true })
         .sort({ updatedAt: -1 });
 
       if (oldSession) {
-        if (remainingTime === 0) return;
-        isNextSession =
-          numbers[1] === oldSession.lastResult.split('-')[0] &&
-          remainingTime === 280;
+        if (seconds === 0) return;
+        // Xử lý và tìm phiên chưa được xử lý kết quả
+        isNextSession = oldSession.result !== '' && seconds === 280;
 
         if (isNextSession) {
-          oldSession.result = numbers[0];
+          // Lưu phiên cũ và tiến hành trả kết quả cho Clients
+          oldSession.result = result;
           await oldSession.save();
           await this.givePrizesToWinerMiniGameClient({
             betId: oldSession.id,
-            result: numbers[0],
+            result: result,
             server: data.server,
           });
 
+          // Tạo phiên mới
           await this.CreateNewMiniGame({
             server: data.server,
             uuid: data.uuid,
-            lastResult: numbers.join('-'),
-            timeEnd: this.addSeconds(new Date(), remainingTime),
+            lastResult: values.join('-'),
+            timeEnd: this.addSeconds(new Date(), seconds),
           });
           return;
         } else {
-          if (remainingTime === 280) {
-            // Save
+          if (seconds === 280) {
+            // Tìm các phiên bị miss và refund tiền cho người chơi
             let old_result = oldSession.result;
-            if (old_result.length === 0) {
+            if (old_result === '') {
               await this.cancelBetMinigame({
                 betId: oldSession.id,
                 server: data.server,
               });
             }
+            // save lại phiên cũ và trả kết quả là refund
+            oldSession.result = 'refund';
+            await oldSession.save();
+            // Tạo phiên mới
             await this.CreateNewMiniGame({
               server: data.server,
               uuid: data.uuid,
-              lastResult: numbers.join('-'),
-              timeEnd: this.addSeconds(new Date(), remainingTime),
+              lastResult: values.join('-'),
+              timeEnd: this.addSeconds(new Date(), seconds),
             });
             return;
           }
         }
       } else {
-        // Tạo phiên mới nếu không có phiên hoạt động nào
+        // Tạo phiên mới nếu không có phiên hoạt động và không có phiên cũ
         await this.CreateNewMiniGame({
           server: data.server,
           uuid: data.uuid,
-          lastResult: numbers.join('-'),
-          timeEnd: this.addSeconds(new Date(), remainingTime),
+          lastResult: values.join('-'),
+          timeEnd: this.addSeconds(new Date(), seconds),
         });
       }
     } catch (err: any) {
