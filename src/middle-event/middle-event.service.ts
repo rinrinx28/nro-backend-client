@@ -533,7 +533,7 @@ export class MiddleEventService {
       values = numbers.slice(1, numbers.length - 1).reverse();
 
       // Lấy giá trị cuối cùng trong mảng đảo ngược làm "kết quả trước"
-      result = values[values.length - 1];
+      result = numbers[0];
     }
 
     return { result, values, seconds };
