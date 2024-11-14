@@ -530,7 +530,7 @@ export class MiddleEventService {
       seconds = parseInt(numbers[numbers.length - 1], 10); // Giá trị cuối cùng là "giây"
 
       // Đảo ngược các giá trị giữa đầu và cuối mảng
-      values = numbers.slice(0, numbers.length - 1).reverse();
+      values = numbers.slice(1, numbers.length - 1).reverse();
 
       // Lấy giá trị cuối cùng trong mảng đảo ngược làm "kết quả trước"
       result = values[values.length - 1];
@@ -592,7 +592,7 @@ export class MiddleEventService {
               {
                 timeEnd: this.addSeconds(new Date(), seconds),
                 result: result ?? '',
-                lastResult: values.join("-"),
+                lastResult: values.join('-'),
               },
               { new: true },
             )
