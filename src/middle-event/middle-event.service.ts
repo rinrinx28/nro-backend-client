@@ -577,7 +577,7 @@ export class MiddleEventService {
         let current_update = moment(`${latestSession.updatedAt}`).unix();
         if (now - current_update < 5) {
           throw new Error(
-            `Skip First BET - Server: ${data.server} - Result: ${result} - Values: ${values}`,
+            `SPAM BET: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
           );
         }
         // Nếu thời gian còn lại là 0, đánh dấu phiên đã kết thúc
@@ -594,22 +594,20 @@ export class MiddleEventService {
         // Cập nhật phiên hiện tại
         const [lastResult1, lastResult2] = latestSession.lastResult.split('-');
         if (values[0] === lastResult1 && values[1] === lastResult2) {
-          if (seconds % 10 === 0) {
-            const updatedSession = await this.miniGameModel
-              .findByIdAndUpdate(
-                latestSession.id,
-                {
-                  timeEnd: this.addSeconds(new Date(), seconds),
-                  result: result ?? '',
-                  lastResult: values.join('-'),
-                },
-                { new: true },
-              )
-              .exec();
-            this.socketGateway.server.emit('mini.bet', {
-              n_game: updatedSession.toObject(),
-            });
-          }
+          const updatedSession = await this.miniGameModel
+            .findByIdAndUpdate(
+              latestSession.id,
+              {
+                timeEnd: this.addSeconds(new Date(), seconds),
+                result: result ?? '',
+                lastResult: values.join('-'),
+              },
+              { new: true },
+            )
+            .exec();
+          this.socketGateway.server.emit('mini.bet', {
+            n_game: updatedSession.toObject(),
+          });
           return;
         }
       }
