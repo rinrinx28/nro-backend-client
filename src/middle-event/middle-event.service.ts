@@ -560,9 +560,9 @@ export class MiddleEventService {
       const serverQuery = { server: data.server };
 
       // Bỏ qua result = null
-      if (!result) {
+      if (!result || values.length < 5) {
         throw new Error(
-          `Skip First BET - Server: ${data.server} - Result: ${result} - Values: ${values}`,
+          `Skip First BET - Server: ${data.server} - Result: ${result} - Values: ${values} - Time: ${seconds}`,
         );
       }
 
@@ -625,7 +625,14 @@ export class MiddleEventService {
       if (oldSession) {
         if (seconds === 0) return;
         // Xử lý và tìm phiên chưa được xử lý kết quả
-        isNextSession = oldSession.result !== '' && seconds === 280;
+        // Kiểm tra và cập nhật phiên hiện tại
+        // Kiểm tra 2 kết quả gần nhất
+        const [lastResult1, lastResult2] = oldSession.lastResult.split('-');
+        isNextSession =
+          oldSession.result !== '' &&
+          seconds === 280 &&
+          values[1] === lastResult1 &&
+          values[2] === lastResult2;
 
         if (isNextSession) {
           // Lưu phiên cũ và tiến hành trả kết quả cho Clients
