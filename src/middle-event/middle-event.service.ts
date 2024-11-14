@@ -592,7 +592,7 @@ export class MiddleEventService {
               {
                 timeEnd: this.addSeconds(new Date(), seconds),
                 result: result ?? '',
-                lastResult: values,
+                lastResult: values.join("-"),
               },
               { new: true },
             )
