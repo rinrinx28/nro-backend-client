@@ -580,35 +580,40 @@ export class MiddleEventService {
             `SPAM BET: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
           );
         }
-        // Nếu thời gian còn lại là 0, đánh dấu phiên đã kết thúc
-        if (seconds === 0) {
-          const updatedSession = await this.miniGameModel
-            .findByIdAndUpdate(latestSession.id, { isEnd: true }, { new: true })
-            .exec();
-          this.socketGateway.server.emit('mini.bet', {
-            n_game: updatedSession.toObject(),
-          });
-          return;
-        }
-
-        // Cập nhật phiên hiện tại
+        // Kiểm tra và cập nhật phiên hiện tại
+        // Kiểm tra 2 kết quả gần nhất
         const [lastResult1, lastResult2] = latestSession.lastResult.split('-');
         if (values[0] === lastResult1 && values[1] === lastResult2) {
-          const updatedSession = await this.miniGameModel
-            .findByIdAndUpdate(
-              latestSession.id,
-              {
-                timeEnd: this.addSeconds(new Date(), seconds),
-                result: result ?? '',
-                lastResult: values.join('-'),
-              },
-              { new: true },
-            )
-            .exec();
-          this.socketGateway.server.emit('mini.bet', {
-            n_game: updatedSession.toObject(),
-          });
-          return;
+          // Nếu thời gian còn lại là 0, đánh dấu phiên đã kết thúc
+          if (seconds === 0) {
+            const updatedSession = await this.miniGameModel
+              .findByIdAndUpdate(
+                latestSession.id,
+                { isEnd: true },
+                { new: true },
+              )
+              .exec();
+            this.socketGateway.server.emit('mini.bet', {
+              n_game: updatedSession.toObject(),
+            });
+            return;
+          } else {
+            const updatedSession = await this.miniGameModel
+              .findByIdAndUpdate(
+                latestSession.id,
+                {
+                  timeEnd: this.addSeconds(new Date(), seconds),
+                  result: result ?? '',
+                  lastResult: values.join('-'),
+                },
+                { new: true },
+              )
+              .exec();
+            this.socketGateway.server.emit('mini.bet', {
+              n_game: updatedSession.toObject(),
+            });
+            return;
+          }
         }
       }
 
