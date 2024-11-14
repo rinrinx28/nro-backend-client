@@ -561,7 +561,7 @@ export class MiddleEventService {
 
       // Bỏ qua result = null
       if (!result) {
-        this.logger.log(
+        throw new Error(
           `Skip First BET - Server: ${data.server} - Result: ${result} - Values: ${values}`,
         );
       }
@@ -573,6 +573,13 @@ export class MiddleEventService {
       let isNextSession = false;
 
       if (latestSession) {
+        let now = moment().unix();
+        let current_update = moment(`${latestSession.updatedAt}`).unix();
+        if (now - current_update < 5) {
+          throw new Error(
+            `Skip First BET - Server: ${data.server} - Result: ${result} - Values: ${values}`,
+          );
+        }
         // Nếu thời gian còn lại là 0, đánh dấu phiên đã kết thúc
         if (seconds === 0) {
           const updatedSession = await this.miniGameModel
@@ -585,21 +592,24 @@ export class MiddleEventService {
         }
 
         // Cập nhật phiên hiện tại
-        if (seconds % 10 === 0) {
-          const updatedSession = await this.miniGameModel
-            .findByIdAndUpdate(
-              latestSession.id,
-              {
-                timeEnd: this.addSeconds(new Date(), seconds),
-                result: result ?? '',
-                lastResult: values.join('-'),
-              },
-              { new: true },
-            )
-            .exec();
-          this.socketGateway.server.emit('mini.bet', {
-            n_game: updatedSession.toObject(),
-          });
+        const [lastResult1, lastResult2] = latestSession.lastResult.split('-');
+        if (values[0] === lastResult1 && values[1] === lastResult2) {
+          if (seconds % 10 === 0) {
+            const updatedSession = await this.miniGameModel
+              .findByIdAndUpdate(
+                latestSession.id,
+                {
+                  timeEnd: this.addSeconds(new Date(), seconds),
+                  result: result ?? '',
+                  lastResult: values.join('-'),
+                },
+                { new: true },
+              )
+              .exec();
+            this.socketGateway.server.emit('mini.bet', {
+              n_game: updatedSession.toObject(),
+            });
+          }
           return;
         }
       }
@@ -665,7 +675,7 @@ export class MiddleEventService {
         });
       }
     } catch (err: any) {
-      this.logger.log(err);
+      this.logger.log(`Err: ${err.message}`);
     } finally {
       release();
     }
