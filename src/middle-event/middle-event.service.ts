@@ -901,6 +901,7 @@ export class MiddleEventService {
         }
         // save ubet;
         ubet.isEnd = true;
+        ubet.status = 1;
         await ubet.save();
         update_userbets.push(ubet.toObject());
       }
