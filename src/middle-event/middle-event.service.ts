@@ -560,7 +560,7 @@ export class MiddleEventService {
       const serverQuery = { server: data.server };
 
       // Bỏ qua result = null
-      if (!result || values.length < 2) {
+      if (!result) {
         throw new Error(
           `Skip First BET - Server: ${data.server} - Result: ${result} - Values: ${values} - Time: ${seconds}`,
         );
@@ -582,8 +582,8 @@ export class MiddleEventService {
         }
         // Kiểm tra và cập nhật phiên hiện tại
         // Kiểm tra 2 kết quả gần nhất
-        const [lastResult1, lastResult2] = latestSession.lastResult.split('-');
-        if (values[0] === lastResult1 && values[1] === lastResult2) {
+        const [lastResult1] = latestSession.lastResult.split('-');
+        if (values[0] === lastResult1) {
           // Nếu thời gian còn lại là 0, đánh dấu phiên đã kết thúc
           if (seconds === 0) {
             const updatedSession = await this.miniGameModel
@@ -626,13 +626,12 @@ export class MiddleEventService {
         if (seconds === 0) return;
         // Xử lý và tìm phiên chưa được xử lý kết quả
         // Kiểm tra và cập nhật phiên hiện tại
-        // Kiểm tra 2 kết quả gần nhất
-        const [lastResult1, lastResult2] = oldSession.lastResult.split('-');
+        // Kiểm tra 1 kết quả gần nhất
+        const [lastResult1] = oldSession.lastResult.split('-');
         isNextSession =
           oldSession.result !== '' &&
           seconds === 280 &&
-          values[1] === lastResult1 &&
-          values[2] === lastResult2;
+          values[1] === lastResult1;
 
         if (isNextSession) {
           // Lưu phiên cũ và tiến hành trả kết quả cho Clients
