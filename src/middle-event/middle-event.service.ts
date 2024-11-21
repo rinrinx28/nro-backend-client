@@ -560,7 +560,7 @@ export class MiddleEventService {
       const serverQuery = { server: data.server };
 
       // Bỏ qua result = null
-      if (!result || values.length < 5) {
+      if (!result || values.length < 2) {
         throw new Error(
           `Skip First BET - Server: ${data.server} - Result: ${result} - Values: ${values} - Time: ${seconds}`,
         );
@@ -659,7 +659,7 @@ export class MiddleEventService {
             if (old_result === '') {
               await this.cancelBetMinigame({
                 betId: oldSession.id,
-                server: data.server,
+                server: oldSession.server,
               });
             }
             // save lại phiên cũ và trả kết quả là refund
@@ -704,7 +704,6 @@ export class MiddleEventService {
       const e_bet = await this.eConfigModel.findOne({ name: 'e_bet' });
       let { cl = 1.95, x = 3.2, g = 70 } = e_bet.option;
 
-      // Let list user join the BET;
       let users: {
         uid: string;
         revice: number;
@@ -712,33 +711,30 @@ export class MiddleEventService {
         amount: number;
       }[] = [];
       let userBets = [];
-      let users_bet = await this.userBetModel.find({
-        betId: betId,
+      let notices: string[] = [];
+
+      // Fetch user bets
+      const users_bet = await this.userBetModel.find({
+        betId,
         isEnd: false,
       });
-      let notices: string[] = [];
-      // Find Winer and save user bet;
-      for (const user_bet of users_bet) {
+
+      // Determine winners and update user bets
+      const savePromises = users_bet.map(async (user_bet) => {
         const { place, typeBet, amount, uid } = user_bet;
 
-        let rate;
+        let rate: number;
         let isWinner = false;
 
+        // Determine rate and winner status based on bet type
         if (typeBet === 'cl') {
           rate = cl;
-          let isRes = parseInt(result, 10);
-          if (isRes % 2 === 0 && place === 'C') {
-            isWinner = true;
-          }
-          if (isRes % 2 !== 0 && place === 'L') {
-            isWinner = true;
-          }
-          if (isRes <= 49 && place === 'X') {
-            isWinner = true;
-          }
-          if (isRes >= 50 && place === 'T') {
-            isWinner = true;
-          }
+          const isRes = parseInt(result, 10);
+          isWinner =
+            (isRes % 2 === 0 && place === 'C') ||
+            (isRes % 2 !== 0 && place === 'L') ||
+            (isRes <= 49 && place === 'X') ||
+            (isRes >= 50 && place === 'T');
         } else if (typeBet === 'x') {
           rate = x;
           isWinner = s_res.split('_')[0] === place;
@@ -747,38 +743,42 @@ export class MiddleEventService {
           isWinner = s_res.split('_')[1] === place;
         }
 
+        // Handle winning bets
         if (isWinner) {
-          user_bet.revice = amount * rate;
-          users.push({
-            uid,
-            revice: user_bet.revice,
-            place,
-            amount,
-          });
+          const revice = amount * rate;
+          users.push({ uid, revice, place, amount });
+          user_bet.revice = revice;
         }
-        // Update the user_bet status and fields
+
+        // Update user bet fields
         user_bet.isEnd = true;
         user_bet.status = 2;
         user_bet.result = result;
+
+        // Save changes
         await user_bet.save();
         userBets.push(user_bet.toObject());
-      }
-
-      // Get user data of list winer;
-      let users_res: { _id: string; money: number }[] = [];
-      let userActives: { uid: string; active: Record<string, any> }[] = [];
-      let clans: { clanId: string; score: number }[] = [];
-      const list_user = await this.userModel.find({
-        _id: {
-          $in: users.map((u) => u.uid),
-        },
       });
-      for (const user of list_user) {
-        const winner = users.filter((u) => u.uid === user.id);
-        for (const w of winner) {
-          const { revice } = w;
 
-          // Cập nhật thông tin active cho người chơi thắng cược
+      // Wait for all updates to complete
+      await Promise.all(savePromises);
+
+      const users_res: { _id: string; money: number }[] = [];
+      const userActives: { uid: string; active: Record<string, any> }[] = [];
+      const clans: { clanId: string; score: number }[] = [];
+
+      // Fetch user data
+      const list_user = await this.userModel.find({
+        _id: { $in: users.map((u) => u.uid) },
+      });
+
+      const saveUserPromises = list_user.map(async (user) => {
+        const winnerData = users.filter((u) => u.uid === user.id);
+
+        for (const winner of winnerData) {
+          const { revice, place, amount } = winner;
+
+          // Add active record for winner
           userActives.push({
             uid: user.id,
             active: {
@@ -786,52 +786,57 @@ export class MiddleEventService {
               betId: old_game.id,
               m_current: user.money,
               m_new: user.money + revice,
-              place: w.place,
+              place,
               server: old_game.server,
-              amount: w.amount,
+              amount,
             },
           });
 
-          // Cập nhật tiền và meta cho user
+          // Update user's money and metadata
           user.money += revice;
-          user.meta.totalTrade += revice; // Cập nhật tổng giao dịch
-          user.meta.limitTrade += revice; // Cập nhật limitedTrade
-          let { clanId = null } = user.meta; // Kiểm tra clanId từ meta
+          user.meta.totalTrade += revice;
+          user.meta.limitTrade += revice;
 
-          // Cập nhật điểm cho clan nếu có clanId
+          const { clanId = null } = user.meta;
+
           if (clanId) {
-            user.meta.score += revice; // Cập nhật tổng điểm của user
-            let clan = clans.findIndex((c) => c.clanId === clanId);
-            if (clan < 0) {
+            // Update user's clan score
+            user.meta.score += revice;
+            const clanIndex = clans.findIndex((c) => c.clanId === clanId);
+
+            if (clanIndex < 0) {
               clans.push({ clanId, score: revice });
             } else {
-              clans[clan].score += revice;
+              clans[clanIndex].score += revice;
             }
           }
 
-          // Đánh dấu trường meta đã thay đổi
+          // Mark `meta` as modified
           user.markModified('meta');
 
-          // Lưu user vào database
-          try {
-            await user.save();
-            console.log(`Cập nhật thành công cho user: ${user.id}`);
-          } catch (err) {
-            console.error(`Lỗi khi lưu user ${user.id}:`, err);
-          }
-
-          // Tạo thông báo cho người thắng cược
-          let convert_key = this.convert_key(w.place);
-          if (w.amount >= 5e8) {
+          // Create notification for the winner
+          const convert_key = this.convert_key(place);
+          if (amount >= 5e8) {
             notices.push(
               `Chúc mừng người chơi ${user.name} đã thắng lớn ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
             );
           }
         }
 
-        // Đưa kết quả cuối cùng của người dùng vào users_res
+        // Save the updated user
+        try {
+          await user.save();
+          console.log(`Cập nhật thành công cho user: ${user.id}`);
+        } catch (err) {
+          console.error(`Lỗi khi lưu user ${user.id}:`, err);
+        }
+
+        // Add final result to `users_res`
         users_res.push({ _id: user.id, money: user.money });
-      }
+      });
+
+      // Wait for all user updates to complete
+      await Promise.all(saveUserPromises);
       // Save clan;
       const bulkOps_clan = clans.map((clan) => ({
         updateOne: {
@@ -902,9 +907,14 @@ export class MiddleEventService {
         // save ubet;
         ubet.isEnd = true;
         ubet.status = 1;
-        await ubet.save();
         update_userbets.push(ubet.toObject());
       }
+      // Update user bets in the database
+      await this.userBetModel.updateMany(
+        { betId },
+        { status: 1, isEnd: true, result: 'refund' },
+        { upsert: true },
+      );
 
       // Get find all user was bet
       const users = await this.userModel.find({
@@ -913,13 +923,17 @@ export class MiddleEventService {
         },
       });
 
-      let update_user = [];
-      // refund money and save user, active
+      const update_user = [];
+      const activePromises = [];
+      const saveUserPromises = [];
+
       for (const user of users) {
-        let target = list_user.find((u) => u.uid === user.id);
+        // Find the matching user in the list
+        const target = list_user.find((u) => u.uid === user.id);
+
         if (target) {
-          // save active
-          await this.userActiveModel.create({
+          // Prepare active data for user
+          const activeData = {
             uid: target.uid,
             active: {
               name: 'cancel_bet',
@@ -927,13 +941,25 @@ export class MiddleEventService {
               m_current: user.money,
               m_new: user.money + target.refund,
             },
-          });
+          };
+
+          // Queue the creation of active record
+          activePromises.push(this.userActiveModel.create(activeData));
+
+          // Update user money
           user.money += target.refund;
-          await user.save();
+
+          // Queue saving user data
+          saveUserPromises.push(user.save());
+
+          // Exclude sensitive fields and prepare response
           const { pwd_h, email, ...res } = user.toObject();
           update_user.push(res);
         }
       }
+
+      // Execute all operations concurrently
+      await Promise.all([...activePromises, ...saveUserPromises]);
 
       const payload_socket = {
         n_game: old_game.toObject(),
