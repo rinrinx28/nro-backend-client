@@ -575,6 +575,7 @@ export class MiddleEventService {
       if (latestSession) {
         let now = moment().unix();
         let current_update = moment(`${latestSession.updatedAt}`).unix();
+        let timeEnd = moment(`${latestSession.timeEnd}`).unix();
         if (now - current_update < 5) {
           throw new Error(
             `SPAM BET: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
@@ -585,7 +586,7 @@ export class MiddleEventService {
         const [lastResult1] = latestSession.lastResult.split('-');
         if (values[0] === lastResult1) {
           // Nếu thời gian còn lại là 0, đánh dấu phiên đã kết thúc
-          if (seconds === 0) {
+          if (timeEnd - now <= 0 || seconds === 0) {
             const updatedSession = await this.miniGameModel
               .findByIdAndUpdate(
                 latestSession.id,
