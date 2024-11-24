@@ -652,16 +652,13 @@ export class MiddleEventService {
         } else {
           if (seconds === 280) {
             // Tìm các phiên bị miss và refund tiền cho người chơi
-            let old_result = oldSession.result;
-            if (old_result.length === 0) {
-              await this.cancelBetMinigame({
-                betId: oldSession.id,
-                server: oldSession.server,
-              });
-              // save lại phiên cũ và trả kết quả là refund
-              oldSession.result = 'refund';
-              await oldSession.save();
-            }
+            await this.cancelBetMinigame({
+              betId: oldSession.id,
+              server: oldSession.server,
+            });
+            // save lại phiên cũ và trả kết quả là refund
+            oldSession.result = 'refund';
+            await oldSession.save();
             // Tạo phiên mới
             await this.CreateNewMiniGame({
               server: data.server,
