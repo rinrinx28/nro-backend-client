@@ -629,7 +629,7 @@ export class MiddleEventService {
         // Kiểm tra và cập nhật phiên hiện tại
         // Kiểm tra 1 kết quả gần nhất
         const [lastResult1] = oldSession.lastResult.split('-');
-        isNextSession = seconds === 280 && values[1] === lastResult1;
+        isNextSession = seconds <= 280 && values[1] === lastResult1;
 
         if (isNextSession) {
           // Lưu phiên cũ và tiến hành trả kết quả cho Clients
@@ -650,7 +650,7 @@ export class MiddleEventService {
           });
           return;
         } else {
-          if (seconds === 280) {
+          if (seconds <= 280) {
             // Tìm các phiên bị miss và refund tiền cho người chơi
             await this.cancelBetMinigame({
               betId: oldSession.id,
@@ -876,89 +876,105 @@ export class MiddleEventService {
   async cancelBetMinigame(payload: { betId: string; server: string }) {
     try {
       const { betId, server } = payload;
-      const old_game = await this.miniGameModel.findById(betId);
-      // Find all userbet not end
-      const userBets = await this.userBetModel.find({
-        betId: betId,
-        isEnd: false,
-        server: server,
-      });
+
+      // Fetch necessary data concurrently
+      const [old_game, userBets] = await Promise.all([
+        this.miniGameModel.findById(betId),
+        this.userBetModel.find({ betId, isEnd: false, server }),
+      ]);
+
+      if (!old_game || userBets.length === 0) return;
+
       // Update user bets in the database
       await this.userBetModel.updateMany(
-        { betId: betId },
+        { betId },
         { status: 1, isEnd: true, result: 'refund' },
-        { upsert: true },
       );
-      let list_user: { uid: string; refund: number; userBetId: string }[] = [];
-      let update_userbets = [];
 
-      // save userbet
-      for (const ubet of userBets) {
-        let index_user = list_user.findIndex((u) => u.uid === ubet.uid);
-        if (index_user > -1) {
-          list_user.push({
-            uid: ubet.uid,
-            refund: ubet.amount,
-            userBetId: ubet.id,
-          });
-        } else {
-          list_user[index_user].refund += ubet.amount;
-        }
-        // save ubet;
-        ubet.isEnd = true;
-        ubet.status = 1;
-        ubet.result = 'refund';
-        update_userbets.push(ubet.toObject());
-      }
-
-      // Get find all user was bet
-      const users = await this.userModel.find({
-        _id: {
-          $in: list_user.map((u) => u.uid),
+      // Group refunds by user
+      const list_user = userBets.reduce(
+        (acc, ubet) => {
+          const existing = acc.find((u) => u.uid === ubet.uid);
+          if (existing) {
+            existing.refund += ubet.amount;
+          } else {
+            acc.push({
+              uid: ubet.uid,
+              refund: ubet.amount,
+              userBetId: ubet.id,
+            });
+          }
+          return acc;
         },
+        [] as { uid: string; refund: number; userBetId: string }[],
+      );
+
+      // Prepare updates for userBets
+      const update_userbets = userBets.map((ubet) => ({
+        ...ubet.toObject(),
+        isEnd: true,
+        status: 1,
+        result: 'refund',
+      }));
+
+      // Fetch all affected users
+      const users = await this.userModel.find({
+        _id: { $in: list_user.map((u) => u.uid) },
       });
 
+      // Prepare bulkWrite operations for users
+      const userBulkOps = [];
+      const activeBulkOps = [];
       const update_user = [];
-      const activePromises = [];
-      const saveUserPromises = [];
 
       for (const user of users) {
-        // Find the matching user in the list
         const target = list_user.find((u) => u.uid === user.id);
-
         if (target) {
-          // Prepare active data for user
-          const activeData = {
-            uid: target.uid,
-            active: {
-              name: 'cancel_bet',
-              userBetId: target.userBetId,
-              m_current: user.money,
-              m_new: user.money + target.refund,
+          // Prepare user update operation
+          userBulkOps.push({
+            updateOne: {
+              filter: { _id: user.id },
+              update: { $inc: { money: target.refund } },
             },
-          };
+          });
 
-          // Queue the creation of active record
-          activePromises.push(this.userActiveModel.create(activeData));
-
-          // Update user money
-          user.money += target.refund;
-
-          // Queue saving user data
-          saveUserPromises.push(user.save());
+          // Prepare active record creation
+          activeBulkOps.push({
+            insertOne: {
+              document: {
+                uid: target.uid,
+                active: {
+                  name: 'cancel_bet',
+                  userBetId: target.userBetId,
+                  m_current: user.money,
+                  m_new: user.money + target.refund,
+                },
+              },
+            },
+          });
 
           // Exclude sensitive fields and prepare response
           const { pwd_h, email, ...res } = user.toObject();
+          res.money += target.refund; // Update the new money in response
           update_user.push(res);
         }
       }
 
-      // Execute all operations concurrently
-      await Promise.all([...activePromises, ...saveUserPromises]);
+      // Execute bulkWrite operations
+      await Promise.all([
+        this.userModel.bulkWrite(userBulkOps),
+        this.userActiveModel.bulkWrite(activeBulkOps),
+      ]);
 
+      // Emit socket event
       const payload_socket = {
         n_game: old_game.toObject(),
-        userBets: update_userbets,
+        userBets: userBets.map((ubet) => ({
+          ...ubet.toObject(),
+          isEnd: true,
+          status: 1,
+          result: 'refund',
+        })),
         data_user: update_user,
       };
       this.socketGateway.server.emit('mini.bet', payload_socket);
