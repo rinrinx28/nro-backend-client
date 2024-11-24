@@ -883,6 +883,12 @@ export class MiddleEventService {
         isEnd: false,
         server: server,
       });
+      // Update user bets in the database
+      await this.userBetModel.updateMany(
+        { betId: betId },
+        { status: 1, isEnd: true, result: 'refund' },
+        { upsert: true },
+      );
       let list_user: { uid: string; refund: number; userBetId: string }[] = [];
       let update_userbets = [];
 
@@ -901,14 +907,9 @@ export class MiddleEventService {
         // save ubet;
         ubet.isEnd = true;
         ubet.status = 1;
+        ubet.result = 'refund';
         update_userbets.push(ubet.toObject());
       }
-      // Update user bets in the database
-      await this.userBetModel.updateMany(
-        { betId },
-        { status: 1, isEnd: true, result: 'refund' },
-        { upsert: true },
-      );
 
       // Get find all user was bet
       const users = await this.userModel.find({
