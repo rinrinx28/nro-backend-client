@@ -603,7 +603,6 @@ export class MiddleEventService {
               .findByIdAndUpdate(
                 latestSession.id,
                 {
-                  timeEnd: this.addSeconds(new Date(), seconds),
                   result: result ?? '',
                   lastResult: values.join('-'),
                 },
