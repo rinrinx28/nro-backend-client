@@ -576,7 +576,7 @@ export class MiddleEventService {
         let now = moment().unix();
         let current_update = moment(`${latestSession.updatedAt}`).unix();
         let timeEnd = moment(`${latestSession.timeEnd}`).unix();
-        if (now - current_update < 5) {
+        if (now - current_update < 1) {
           throw new Error(
             `SPAM BET: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
           );
@@ -969,12 +969,7 @@ export class MiddleEventService {
       // Emit socket event
       const payload_socket = {
         n_game: old_game.toObject(),
-        userBets: userBets.map((ubet) => ({
-          ...ubet.toObject(),
-          isEnd: true,
-          status: 1,
-          result: 'refund',
-        })),
+        userBets: update_userbets,
         data_user: update_user,
       };
       this.socketGateway.server.emit('mini.bet', payload_socket);
