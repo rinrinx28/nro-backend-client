@@ -905,11 +905,17 @@ export class MiddleEventService {
               uid: ubet.uid,
               refund: ubet.amount,
               userBetId: ubet.id,
+              place: ubet.place,
             });
           }
           return acc;
         },
-        [] as { uid: string; refund: number; userBetId: string }[],
+        [] as {
+          uid: string;
+          refund: number;
+          userBetId: string;
+          place: string;
+        }[],
       );
 
       // Prepare updates for userBets
@@ -951,6 +957,9 @@ export class MiddleEventService {
                   userBetId: target.userBetId,
                   m_current: user.money,
                   m_new: user.money + target.refund,
+                  betId: betId,
+                  amount: target.refund,
+                  place: target.place,
                 },
               },
             },
