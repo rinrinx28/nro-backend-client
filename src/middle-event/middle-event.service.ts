@@ -649,7 +649,8 @@ export class MiddleEventService {
           });
           return;
         } else {
-          if (seconds <= 280) {
+          let isMissSession = seconds <= 280 && values[0] !== lastResult1;
+          if (isMissSession) {
             // Tìm các phiên bị miss và refund tiền cho người chơi
             await this.cancelBetMinigame({
               betId: oldSession.id,
@@ -667,6 +668,9 @@ export class MiddleEventService {
             });
             return;
           }
+          throw new Error(
+            `BET Delay: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
+          );
         }
       } else {
         // Tạo phiên mới nếu không có phiên hoạt động và không có phiên cũ
