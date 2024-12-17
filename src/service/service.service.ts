@@ -76,7 +76,8 @@ export class ServiceService {
   }
 
   async updateService(payload: UpdateService) {
-    const parameter = `${payload.typeUpdate}.updateService`; // Value will be lock
+    const { id, typeUpdate, data, realAmount } = payload;
+    const parameter = `${typeUpdate}.updateService`; // Khóa mutex theo loại cập nhật
 
     // Create mutex if it not exist
     if (!this.mutexMap.has(parameter)) {
@@ -86,50 +87,45 @@ export class ServiceService {
     const mutex = this.mutexMap.get(parameter);
     const release = await mutex.acquire();
     try {
-      const e_shop = await this.EConfigModel.findOne({ name: 'e_shop' });
-      const { isEnable } = e_shop;
-      if (!isEnable) throw new Error('Chức năng nạp/rút tạm đóng!');
-      const { data, typeUpdate, id, realAmount } = payload;
+      // Kiểm tra trạng thái e_shop
+      const eShopConfig = await this.EConfigModel.findOne({ name: 'e_shop' });
+      if (!eShopConfig?.isEnable)
+        throw new Error('Chức năng nạp/rút tạm đóng!');
+
       const target_s = await this.serviceModel.findById(id);
       if (!target_s) throw new Error('Không tìm thấy Giao Dịch');
-      this.logger.log(`Update Service: ${id} - Status: ${typeUpdate}`);
+
       const { type, amount, uid } = target_s.toObject();
+      this.logger.log(`Update Service: ${id} - Status: ${typeUpdate}`);
+
+      // Hàm phụ cập nhật service trong MongoDB
+      const updateServiceInDB = async (updateData: any) => {
+        return this.serviceModel.findByIdAndUpdate(id, updateData, {
+          new: true,
+          upsert: true,
+        });
+      };
+
+      // Hàm phụ emit socket
+      const emitServiceUpdate = (updatedService: any) => {
+        this.socketGateway.server.emit('service.update', updatedService);
+      };
 
       let service = target_s.toObject();
       switch (typeUpdate) {
         case '0':
-          await this.serviceModel.findByIdAndUpdate(id, data, {
-            new: true,
-            upsert: true,
-          });
+          await updateServiceInDB(data);
           return;
         case '1':
-          await this.serviceModel.findByIdAndUpdate(id, data, {
-            new: true,
-            upsert: true,
+          this.socketGateway.server.emit('service.cancel', {
+            serviceId: service._id,
+            uid: uid,
           });
-          await this.updateUserWithType({
-            uid: uid.toString(),
-            amount,
-            type,
-            typeUpdate,
-            realAmount,
-          });
-          service = { ...service, ...data };
-          this.socketGateway.server.emit('service.update', service);
           return 'ok';
         default:
-          await this.serviceModel.findByIdAndUpdate(
-            id,
-            {
-              ...data,
-              revice: amount,
-            },
-            {
-              new: true,
-              upsert: true,
-            },
-          );
+          const updateData =
+            typeUpdate === '2' ? { ...data, revice: amount } : data;
+          const updatedService = await updateServiceInDB(updateData);
           await this.updateUserWithType({
             uid: uid.toString(),
             amount,
@@ -137,18 +133,14 @@ export class ServiceService {
             typeUpdate,
             realAmount,
           });
-          service = {
-            ...service,
-            ...data,
-            revice: amount,
-          };
-          this.socketGateway.server.emit('service.update', service);
+          emitServiceUpdate(updatedService);
           return 'ok';
       }
     } catch (err: any) {
       this.logger.log(
         `Update Service Err: ${payload.id} - Status: ${payload.typeUpdate} - Msg: ${err.message}`,
       );
+      this.socketGateway.server.emit('service.cancel', id);
       return `ok`;
     } finally {
       release();
@@ -171,227 +163,131 @@ export class ServiceService {
       let { pwd_h, ...user } = target_u.toObject();
       let { money } = user;
 
-      if (typeUpdate === '1') {
-        // Refund money to User;
-        if (type === '0') {
-          let refund_money_rgold = amount * 1e6 * 37;
-          // Refund Money to user with rate 1e6*37
-          let user_rgold = await this.userModel.findByIdAndUpdate(
-            uid,
-            {
-              $inc: {
-                money: +refund_money_rgold,
-                'meta.limitTrade': +refund_money_rgold,
-                'meta.trade': -refund_money_rgold,
-              },
+      if (type === '0') {
+        // save active
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'w_s_rgold',
+            status: typeUpdate,
+            m_current: money,
+            m_new: money,
+          },
+        });
+        let user_rgold = await this.userModel.findByIdAndUpdate(
+          uid,
+          {
+            $inc: {
+              'meta.withdraw': +amount * 37e6,
             },
-            {
-              new: true,
-              upsert: true,
-            },
-          );
+          },
+          {
+            new: true,
+            upsert: true,
+          },
+        );
 
-          let { pwd_h, ...res_u } = user_rgold.toObject();
+        let { pwd_h, ...res_u } = user_rgold.toObject();
+        this.socketGateway.server.emit('user.update', {
+          ...res_u,
+        });
+        return;
+      } else if (type === '1') {
+        // save active
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'w_s_gold',
+            status: typeUpdate,
+            m_current: money,
+            m_new: money,
+          },
+        });
+        let user_rgold = await this.userModel.findByIdAndUpdate(
+          uid,
+          {
+            $inc: {
+              'meta.withdraw': +amount,
+            },
+          },
+          {
+            new: true,
+            upsert: true,
+          },
+        );
 
-          // save active
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'w_c_rgold',
-              status: typeUpdate,
-              m_current: res_u.money - refund_money_rgold,
-              m_new: res_u.money,
+        let { pwd_h, ...res_u } = user_rgold.toObject();
+        this.socketGateway.server.emit('user.update', {
+          ...res_u,
+        });
+        return;
+      } else if (type === '2') {
+        let deposit_rgold = amount * 1e6 * 37;
+        let user_rgold = await this.userModel.findByIdAndUpdate(
+          uid,
+          {
+            $inc: {
+              money: +deposit_rgold,
+              'meta.deposit': +deposit_rgold,
+              'meta.totalScore': +deposit_rgold,
             },
-          });
-          this.socketGateway.server.emit('user.update', {
-            ...res_u,
-          });
-          return;
-        } else if (type === '1') {
-          // Refund Money to user with rate 1e6*37
-          let user_gold = await this.userModel.findByIdAndUpdate(
-            uid,
-            {
-              $inc: {
-                money: +amount,
-                'meta.limitTrade': +amount,
-                'meta.trade': -amount,
-              },
-            },
-            {
-              new: true,
-              upsert: true,
-            },
-          );
-          let { pwd_h, ...res_u } = user_gold.toObject();
+          },
+          {
+            new: true,
+            upsert: true,
+          },
+        );
 
-          // save active
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'w_c_gold',
-              status: typeUpdate,
-              m_current: res_u.money - amount,
-              m_new: res_u.money,
-            },
-          });
-          this.socketGateway.server.emit('user.update', {
-            ...res_u,
-          });
-          return;
-        } else if (type === '2') {
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'd_c_rgold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money,
-            },
-          });
-          return;
-        } else {
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'd_c_rgold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money,
-            },
-          });
-          return;
-        }
-      }
+        let { pwd_h, ...res_u } = user_rgold.toObject();
 
-      if (typeUpdate === '2') {
-        // Refund money to User;
-        if (type === '0') {
-          // save active
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'w_s_rgold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money,
-            },
-          });
-          let user_rgold = await this.userModel.findByIdAndUpdate(
-            uid,
-            {
-              $inc: {
-                'meta.withdraw': +amount * 37e6,
-              },
-            },
-            {
-              new: true,
-              upsert: true,
-            },
-          );
+        await this.addDiamon(uid, deposit_rgold);
 
-          let { pwd_h, ...res_u } = user_rgold.toObject();
-          this.socketGateway.server.emit('user.update', {
-            ...res_u,
-          });
-          return;
-        } else if (type === '1') {
-          // save active
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'w_s_gold',
-              status: typeUpdate,
-              m_current: money,
-              m_new: money,
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'd_s_rgold',
+            status: typeUpdate,
+            m_current: res_u.money - deposit_rgold,
+            m_new: res_u.money,
+          },
+        });
+        this.socketGateway.server.emit('user.update', {
+          ...res_u,
+        });
+        await this.addVip(res_u._id.toString());
+        return;
+      } else {
+        let user_gold = await this.userModel.findByIdAndUpdate(
+          uid,
+          {
+            $inc: {
+              money: +amount,
+              'meta.deposit': +amount,
+              'meta.totalScore': +amount,
             },
-          });
-          let user_rgold = await this.userModel.findByIdAndUpdate(
-            uid,
-            {
-              $inc: {
-                'meta.withdraw': +amount,
-              },
-            },
-            {
-              new: true,
-              upsert: true,
-            },
-          );
+          },
+          {
+            new: true,
+            upsert: true,
+          },
+        );
+        let { pwd_h, ...res_u } = user_gold.toObject();
+        await this.addDiamon(uid, amount);
 
-          let { pwd_h, ...res_u } = user_rgold.toObject();
-          this.socketGateway.server.emit('user.update', {
-            ...res_u,
-          });
-          return;
-        } else if (type === '2') {
-          let deposit_rgold = amount * 1e6 * 37;
-          let user_rgold = await this.userModel.findByIdAndUpdate(
-            uid,
-            {
-              $inc: {
-                money: +deposit_rgold,
-                'meta.deposit': +deposit_rgold,
-                'meta.totalScore': +deposit_rgold,
-              },
-            },
-            {
-              new: true,
-              upsert: true,
-            },
-          );
-
-          let { pwd_h, ...res_u } = user_rgold.toObject();
-
-          await this.addDiamon(uid, deposit_rgold);
-
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'd_s_rgold',
-              status: typeUpdate,
-              m_current: res_u.money - deposit_rgold,
-              m_new: res_u.money,
-            },
-          });
-          this.socketGateway.server.emit('user.update', {
-            ...res_u,
-          });
-          await this.addVip(res_u._id.toString());
-          return;
-        } else {
-          let user_gold = await this.userModel.findByIdAndUpdate(
-            uid,
-            {
-              $inc: {
-                money: +amount,
-                'meta.deposit': +amount,
-                'meta.totalScore': +amount,
-              },
-            },
-            {
-              new: true,
-              upsert: true,
-            },
-          );
-          let { pwd_h, ...res_u } = user_gold.toObject();
-          await this.addDiamon(uid, amount);
-
-          await this.userActiveModel.create({
-            uid: uid,
-            active: {
-              name: 'd_s_gold',
-              status: typeUpdate,
-              m_current: res_u.money - amount,
-              m_new: res_u.money,
-            },
-          });
-          this.socketGateway.server.emit('user.update', {
-            ...res_u,
-          });
-          await this.addVip(res_u._id.toString());
-          return;
-        }
+        await this.userActiveModel.create({
+          uid: uid,
+          active: {
+            name: 'd_s_gold',
+            status: typeUpdate,
+            m_current: res_u.money - amount,
+            m_new: res_u.money,
+          },
+        });
+        this.socketGateway.server.emit('user.update', {
+          ...res_u,
+        });
+        await this.addVip(res_u._id.toString());
+        return;
       }
     } catch (err: any) {
       return;
