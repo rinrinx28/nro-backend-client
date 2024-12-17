@@ -172,6 +172,7 @@ export class ServiceService {
             status: typeUpdate,
             m_current: money,
             m_new: money,
+            amount: amount,
           },
         });
         let user_rgold = await this.userModel.findByIdAndUpdate(
@@ -201,6 +202,7 @@ export class ServiceService {
             status: typeUpdate,
             m_current: money,
             m_new: money,
+            amount: amount,
           },
         });
         let user_rgold = await this.userModel.findByIdAndUpdate(
@@ -249,6 +251,7 @@ export class ServiceService {
             status: typeUpdate,
             m_current: res_u.money - deposit_rgold,
             m_new: res_u.money,
+            amount: amount,
           },
         });
         this.socketGateway.server.emit('user.update', {
@@ -281,6 +284,7 @@ export class ServiceService {
             status: typeUpdate,
             m_current: res_u.money - amount,
             m_new: res_u.money,
+            amount: amount,
           },
         });
         this.socketGateway.server.emit('user.update', {
