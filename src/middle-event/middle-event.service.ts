@@ -583,8 +583,8 @@ export class MiddleEventService {
         }
         // Kiểm tra và cập nhật phiên hiện tại
         // Kiểm tra 1 kết quả gần nhất
-        const [lastResult1] = latestSession.lastResult.split('-');
-        if (values[0] === lastResult1) {
+        const lastResult = latestSession.lastResult.split('-');
+        if (values[0] === lastResult[0]) {
           // Nếu thời gian còn lại là 0, đánh dấu phiên đã kết thúc
           if (timeEnd - now <= 0 || seconds === 0) {
             const updatedSession = await this.miniGameModel
@@ -603,7 +603,7 @@ export class MiddleEventService {
               .findByIdAndUpdate(
                 latestSession.id,
                 {
-                  result: result ?? '',
+                  result: '',
                   lastResult: values.join('-'),
                 },
                 { new: true },
@@ -615,6 +615,7 @@ export class MiddleEventService {
             return;
           }
         }
+        return;
       }
 
       // Xử lý phiên cũ gần nhất nếu không có phiên hoạt động
@@ -627,8 +628,8 @@ export class MiddleEventService {
         // Xử lý và tìm phiên chưa được xử lý kết quả
         // Kiểm tra và cập nhật phiên hiện tại
         // Kiểm tra 1 kết quả gần nhất
-        const [lastResult1] = oldSession.lastResult.split('-');
-        isNextSession = seconds <= 280 && values[1] === lastResult1;
+        const lastResult = oldSession.lastResult.split('-');
+        isNextSession = seconds <= 280 && values[1] === lastResult[0];
 
         if (isNextSession) {
           // Lưu phiên cũ và tiến hành trả kết quả cho Clients
@@ -649,7 +650,7 @@ export class MiddleEventService {
           });
           return;
         } else {
-          let isMissSession = seconds <= 280 && values[0] !== lastResult1;
+          let isMissSession = seconds <= 280 && values[0] !== lastResult[0];
           if (isMissSession) {
             // Tìm các phiên bị miss và refund tiền cho người chơi
             await this.cancelBetMinigame({
