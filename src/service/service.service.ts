@@ -68,15 +68,15 @@ export class ServiceService {
         throw new Error(
           'giao dịch của bạn bị hủy, xin tạo lại tại nrogam e.m e',
         );
-      // let cronJob = await this.cronModel.findOne({ serviceId: service.id });
-      // let current = Math.floor(new Date().getTime() / 1000);
-      // let timeEnd = Math.floor(
-      //   new Date(`${cronJob.cancelTime}`).getTime() / 1000,
-      // );
-      // let timeDiff = timeEnd - current;
-      // if (timeDiff <= 120) {
-      //   throw new Error('giao dich da khoa, xin tạo lại tại nrogam e.m e');
-      // }
+      let cronJob = await this.cronModel.findOne({ serviceId: service.id });
+      let current = Math.floor(new Date().getTime() / 1000);
+      let timeEnd = Math.floor(
+        new Date(`${cronJob.cancelTime}`).getTime() / 1000,
+      );
+      let timeDiff = timeEnd - current;
+      if (timeDiff <= 60) {
+        throw new Error('giao dich da khoa, xin tạo lại tại nrogam e.m e');
+      }
       this.logger.log(
         `Query Service ${playerName} - ${service.id} - amount:${service.amount} - Type: ${service.type}`,
       );
