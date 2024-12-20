@@ -610,7 +610,7 @@ export class MiddleEventService {
                   result: '',
                   lastResult: values.join('-'),
                 },
-                { new: true },
+                { new: true, upsert: true },
               )
               .exec();
             this.socketGateway.server.emit('mini.bet', {
@@ -654,7 +654,7 @@ export class MiddleEventService {
           });
           return;
         } else {
-          let isMissSession = seconds <= 280 && values[0] !== lastResult[0];
+          let isMissSession = seconds <= 280;
           if (isMissSession) {
             // Tìm các phiên bị miss và refund tiền cho người chơi
             await this.cancelBetMinigame({
