@@ -75,9 +75,7 @@ export class ServiceService {
       );
       let timeDiff = timeEnd - current;
       if (timeDiff <= 20) {
-        throw new Error(
-          'Giao dịch của bạn tạm khóa, xin tạo lại tại nrogam e.m e',
-        );
+        throw new Error('giao dich da khoa, xin tạo lại tại nrogam e.m e');
       }
       this.logger.log(
         `Query Service ${playerName} - ${service.id} - amount:${service.amount} - Type: ${service.type}`,
