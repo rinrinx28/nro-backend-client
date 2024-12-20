@@ -63,17 +63,22 @@ export class ServiceService {
         })
         .sort({ updatedAt: -1 });
       if (!service) throw new Error('bạn chưa tạo giao dịch tại nrogam e.m e');
-      let currentTime = Math.floor(new Date().getTime() / 1000);
-      let timeEnd = Math.floor(new Date(`${service.timeEnd}`).getTime() / 1000);
-      if (currentTime - timeEnd > 590)
-        throw new Error(
-          'giao dịch của bạn đã hết hạn, xin tạo lại tại nrogam e.m e',
-        );
 
       if (service.isEnd)
         throw new Error(
           'giao dịch của bạn bị hủy, xin tạo lại tại nrogam e.m e',
         );
+      let cronJob = await this.cronModel.findOne({ serviceId: service.id });
+      let current = Math.floor(new Date().getTime() / 1000);
+      let timeEnd = Math.floor(
+        new Date(`${cronJob.cancelTime}`).getTime() / 1000,
+      );
+      let timeDiff = timeEnd - current;
+      if (timeDiff <= 20) {
+        throw new Error(
+          'Giao dịch của bạn tạm khóa, xin tạo lại tại nrogam e.m e',
+        );
+      }
       this.logger.log(
         `Query Service ${playerName} - ${service.id} - amount:${service.amount} - Type: ${service.type}`,
       );
@@ -110,17 +115,6 @@ export class ServiceService {
 
       // Hàm phụ cập nhật service trong MongoDB
       const updateServiceInDB = async (updateData: any, sId: string) => {
-        let cronJob = await this.cronModel.findOne({ serviceId: sId });
-        let current = Math.floor(new Date().getTime() / 1000);
-        let timeEnd = Math.floor(
-          new Date(`${cronJob.cancelTime}`).getTime() / 1000,
-        );
-        let timeDiff = timeEnd - current;
-        if (timeDiff <= 20) {
-          throw new Error(
-            'Giao dịch của bạn tạm khóa, xin tạo lại tại nrogam e.m e',
-          );
-        }
         return this.serviceModel.findByIdAndUpdate(sId, updateData, {
           new: true,
           upsert: true,

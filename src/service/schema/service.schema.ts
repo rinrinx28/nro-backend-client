@@ -33,9 +33,6 @@ export class Service {
   @Prop({ default: false })
   isEnd: boolean;
 
-  @Prop()
-  timeEnd: Date;
-
   @Prop({ default: '' })
   bot_id: string;
 
