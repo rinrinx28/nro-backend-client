@@ -74,12 +74,7 @@ export class AppController {
     @Query('bot_id') bot_id: string,
     @Query('player_id') player_id: string,
     @Query('player_name') player_name: string,
-    @Query('server') server: string,
     @Query('service_id') service_id: string,
-    @Query('money_last') money_last: string,
-    @Query('money_current') money_current: string,
-    @Query('money_trade') money_trade: string,
-    @Query('money_receive') money_receive: string,
   ) {
     switch (type) {
       case '0':
@@ -108,10 +103,6 @@ export class AppController {
             playerName: playerName,
             bot_id: bot_id,
           },
-          realAmount: {
-            money_trade: 0,
-            money_receive: 0,
-          },
         });
         return `ok|${player_id}|${_id}|${type}|${amount}`;
       case '1':
@@ -129,10 +120,6 @@ export class AppController {
             isEnd: true,
             status: '1',
           },
-          realAmount: {
-            money_trade: 0,
-            money_receive: 0,
-          },
         });
       case '2':
         // TODO Data Query: bot_id, player_id, service_id, money_last, money_current, money_trade, money_receive, server
@@ -140,17 +127,12 @@ export class AppController {
         // / + money_current: vàng/thỏi vàng sau giao dịch của bot (vàng/thỏi vàng hiện tại)
         // / + money_trade: vàng/thỏi vàng mà bot giao dịch
         // / + money_receive: vàng/thỏi vàng mà người chơi giao dịch
-        console.log(money_trade, money_receive);
         return this.service.updateService({
           id: service_id,
           typeUpdate: '2',
           data: {
             isEnd: true,
             status: '2',
-          },
-          realAmount: {
-            money_trade: parseInt(money_trade, 10),
-            money_receive: parseInt(money_receive, 10),
           },
         });
       default:

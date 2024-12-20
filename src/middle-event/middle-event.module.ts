@@ -17,6 +17,7 @@ import { Bot, BotSchema } from 'src/bot/schema/bot.schema';
 import { Clan, ClanSchema } from './schema/clan.schema';
 import { Session, SessionSchema } from './schema/ISession.schema';
 import { Jackpot, JackpotSchema } from './schema/jackpot';
+import { Cron, CronSchema } from './schema/cron.schema';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { Jackpot, JackpotSchema } from './schema/jackpot';
       { name: Clan.name, schema: ClanSchema },
       { name: Session.name, schema: SessionSchema },
       { name: Jackpot.name, schema: JackpotSchema },
+      { name: Cron.name, schema: CronSchema },
     ]),
     SocketModule,
   ],

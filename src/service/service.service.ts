@@ -8,6 +8,7 @@ import { SocketGateway } from 'src/socket/socket.gateway';
 import { EConfig } from 'src/middle-event/schema/config.schema';
 import * as moment from 'moment';
 import { Mutex } from 'async-mutex';
+import { Cron } from 'src/middle-event/schema/cron.schema';
 
 interface UpdateService {
   id: string;
@@ -21,7 +22,8 @@ interface UpdateUserWithTypeService {
   typeUpdate: '1' | '2' | '0';
   uid: string;
   amount: number;
-  realAmount: Record<string, number>;
+  realAmount?: Record<string, number>;
+  serviceId?: string;
 }
 
 @Injectable()
@@ -35,6 +37,8 @@ export class ServiceService {
     private readonly userActiveModel: Model<UserActive>,
     @InjectModel(EConfig.name)
     private readonly EConfigModel: Model<EConfig>,
+    @InjectModel(Cron.name)
+    private readonly cronModel: Model<Cron>,
     private readonly socketGateway: SocketGateway,
   ) {}
 
@@ -59,6 +63,13 @@ export class ServiceService {
         })
         .sort({ updatedAt: -1 });
       if (!service) throw new Error('bạn chưa tạo giao dịch tại nrogam e.m e');
+      let currentTime = Math.floor(new Date().getTime() / 1000);
+      let timeEnd = Math.floor(new Date(`${service.timeEnd}`).getTime() / 1000);
+      if (currentTime - timeEnd > 590)
+        throw new Error(
+          'giao dịch của bạn đã hết hạn, xin tạo lại tại nrogam e.m e',
+        );
+
       if (service.isEnd)
         throw new Error(
           'giao dịch của bạn bị hủy, xin tạo lại tại nrogam e.m e',
@@ -76,8 +87,9 @@ export class ServiceService {
   }
 
   async updateService(payload: UpdateService) {
-    const { id, typeUpdate, data, realAmount } = payload;
+    const { id, typeUpdate, data } = payload;
     const parameter = `${typeUpdate}.updateService`; // Khóa mutex theo loại cập nhật
+    const target_s = await this.serviceModel.findById(id);
 
     // Create mutex if it not exist
     if (!this.mutexMap.has(parameter)) {
@@ -91,16 +103,25 @@ export class ServiceService {
       const eShopConfig = await this.EConfigModel.findOne({ name: 'e_shop' });
       if (!eShopConfig?.isEnable)
         throw new Error('Chức năng nạp/rút tạm đóng!');
-
-      const target_s = await this.serviceModel.findById(id);
       if (!target_s) throw new Error('Không tìm thấy Giao Dịch');
 
       const { type, amount, uid } = target_s.toObject();
       this.logger.log(`Update Service: ${id} - Status: ${typeUpdate}`);
 
       // Hàm phụ cập nhật service trong MongoDB
-      const updateServiceInDB = async (updateData: any) => {
-        return this.serviceModel.findByIdAndUpdate(id, updateData, {
+      const updateServiceInDB = async (updateData: any, sId: string) => {
+        let cronJob = await this.cronModel.findOne({ serviceId: sId });
+        let current = Math.floor(new Date().getTime() / 1000);
+        let timeEnd = Math.floor(
+          new Date(`${cronJob.cancelTime}`).getTime() / 1000,
+        );
+        let timeDiff = timeEnd - current;
+        if (timeDiff <= 20) {
+          throw new Error(
+            'Giao dịch của bạn tạm khóa, xin tạo lại tại nrogam e.m e',
+          );
+        }
+        return this.serviceModel.findByIdAndUpdate(sId, updateData, {
           new: true,
           upsert: true,
         });
@@ -114,7 +135,7 @@ export class ServiceService {
       let service = target_s.toObject();
       switch (typeUpdate) {
         case '0':
-          await updateServiceInDB(data);
+          await updateServiceInDB(data, service._id.toString());
           return;
         case '1':
           this.socketGateway.server.emit('service.cancel', {
@@ -123,15 +144,17 @@ export class ServiceService {
           });
           return 'ok';
         default:
-          const updateData =
-            typeUpdate === '2' ? { ...data, revice: amount } : data;
-          const updatedService = await updateServiceInDB(updateData);
+          const updateData = { ...data, revice: amount };
+          const updatedService = await updateServiceInDB(
+            updateData,
+            service._id.toString(),
+          );
           await this.updateUserWithType({
             uid: uid.toString(),
             amount,
             type,
             typeUpdate,
-            realAmount,
+            serviceId: service._id.toString(),
           });
           emitServiceUpdate(updatedService);
           return 'ok';
@@ -140,8 +163,11 @@ export class ServiceService {
       this.logger.log(
         `Update Service Err: ${payload.id} - Status: ${payload.typeUpdate} - Msg: ${err.message}`,
       );
-      this.socketGateway.server.emit('service.cancel', id);
-      return `ok`;
+      this.socketGateway.server.emit('service.cancel', {
+        serviceId: target_s._id ?? '',
+        uid: target_s.uid ?? '',
+      });
+      return `no|${err.message}`;
     } finally {
       release();
     }
@@ -158,7 +184,7 @@ export class ServiceService {
     const mutex = this.mutexMap.get(parameter);
     const release = await mutex.acquire();
     try {
-      const { type, amount, uid, typeUpdate, realAmount } = payload;
+      const { type, amount, uid, typeUpdate, serviceId = '' } = payload;
       const target_u = await this.userModel.findById(uid);
       let { pwd_h, ...user } = target_u.toObject();
       let { money } = user;
@@ -172,7 +198,8 @@ export class ServiceService {
             status: typeUpdate,
             m_current: money,
             m_new: money,
-            amount: amount,
+            amount: amount * 37e6,
+            serviceId: serviceId,
           },
         });
         let user_rgold = await this.userModel.findByIdAndUpdate(
@@ -203,6 +230,7 @@ export class ServiceService {
             m_current: money,
             m_new: money,
             amount: amount,
+            serviceId: serviceId,
           },
         });
         let user_rgold = await this.userModel.findByIdAndUpdate(
@@ -252,6 +280,7 @@ export class ServiceService {
             m_current: res_u.money - deposit_rgold,
             m_new: res_u.money,
             amount: amount,
+            serviceId: serviceId,
           },
         });
         this.socketGateway.server.emit('user.update', {
@@ -285,6 +314,7 @@ export class ServiceService {
             m_current: res_u.money - amount,
             m_new: res_u.money,
             amount: amount,
+            serviceId: serviceId,
           },
         });
         this.socketGateway.server.emit('user.update', {

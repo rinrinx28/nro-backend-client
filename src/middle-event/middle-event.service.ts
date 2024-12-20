@@ -16,6 +16,7 @@ import { Clan } from './schema/clan.schema';
 import { Mutex } from 'async-mutex';
 import * as moment from 'moment';
 import { Jackpot } from './schema/jackpot';
+import { Cron } from './schema/cron.schema';
 
 interface IData {
   uuid: string;
@@ -47,6 +48,8 @@ export class MiddleEventService {
     private readonly clanModel: Model<Clan>,
     @InjectModel(Jackpot.name)
     private readonly JackpotModel: Model<Jackpot>,
+    @InjectModel(Cron.name)
+    private readonly cronModel: Model<Cron>,
   ) {}
   private logger: Logger = new Logger('Middle Handler');
   private readonly mutexMap = new Map<string, Mutex>();
@@ -599,6 +602,7 @@ export class MiddleEventService {
             });
             return;
           } else {
+            // Update phiên hiện tại
             const updatedSession = await this.miniGameModel
               .findByIdAndUpdate(
                 latestSession.id,
