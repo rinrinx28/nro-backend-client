@@ -614,7 +614,6 @@ export class MiddleEventService {
                 {
                   result: '',
                   lastResult: values.join('-'),
-                  timeEnd: this.addSeconds(new Date(), seconds),
                 },
                 { new: true, upsert: true },
               )
