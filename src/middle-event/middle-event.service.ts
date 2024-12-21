@@ -77,8 +77,6 @@ export class MiddleEventService {
 
   @OnEvent('notice.info', { async: true })
   async handleNoticeInfo(payload: NoticeInfoEvent) {
-    // if (payload.server === '6') {
-    // }
     await this.miniGameClient(payload);
   }
 
@@ -543,6 +541,10 @@ export class MiddleEventService {
   }
 
   async miniGameClient(data: IData) {
+    if (!data || !data.server || !data.content) {
+      this.logger.error('Invalid data input');
+      return;
+    }
     const parameter = `${data.server}.mini.info`; // Value will be lock
 
     // Create mutex if it not exist
@@ -556,6 +558,7 @@ export class MiddleEventService {
       const parsedContent = this.extractValues(data.content);
 
       if (!parsedContent) {
+        this.logger.error('Parsed content is null');
         return;
       }
 
@@ -579,15 +582,11 @@ export class MiddleEventService {
         let now = moment().unix();
         let current_update = moment(`${latestSession.updatedAt}`).unix();
         let timeEnd = moment(`${latestSession.timeEnd}`).unix();
-        if (now - current_update < 3) {
-          throw new Error(
-            `SPAM BET: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
-          );
-        }
         // Kiểm tra và cập nhật phiên hiện tại
         // Kiểm tra 1 kết quả gần nhất
         const lastResult = latestSession.lastResult.split('-');
-        if (values[0] === lastResult[0]) {
+        const isSession = values[0] === lastResult[0];
+        if (isSession) {
           // Nếu thời gian còn lại là 0, đánh dấu phiên đã kết thúc
           if (timeEnd - now <= 0 || seconds === 0) {
             const updatedSession = await this.miniGameModel
@@ -602,6 +601,12 @@ export class MiddleEventService {
             });
             return;
           } else {
+            // Check update time
+            if (now - current_update < 1) {
+              throw new Error(
+                `SPAM BET: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
+              );
+            }
             // Update phiên hiện tại
             const updatedSession = await this.miniGameModel
               .findByIdAndUpdate(
@@ -609,6 +614,7 @@ export class MiddleEventService {
                 {
                   result: '',
                   lastResult: values.join('-'),
+                  timeEnd: this.addSeconds(new Date(), seconds),
                 },
                 { new: true, upsert: true },
               )
@@ -618,52 +624,38 @@ export class MiddleEventService {
             });
             return;
           }
-        }
-        return;
-      }
-
-      // Xử lý phiên cũ gần nhất nếu không có phiên hoạt động
-      const oldSession = await this.miniGameModel
-        .findOne({ ...serverQuery, isEnd: true })
-        .sort({ updatedAt: -1 });
-
-      if (oldSession) {
-        if (seconds === 0) return;
-        // Xử lý và tìm phiên chưa được xử lý kết quả
-        // Kiểm tra và cập nhật phiên hiện tại
-        // Kiểm tra 1 kết quả gần nhất
-        const lastResult = oldSession.lastResult.split('-');
-        isNextSession = seconds <= 280 && values[1] === lastResult[0];
-
-        if (isNextSession) {
-          // Lưu phiên cũ và tiến hành trả kết quả cho Clients
-          oldSession.result = result;
-          await oldSession.save();
-          await this.givePrizesToWinerMiniGameClient({
-            betId: oldSession.id,
-            result: result,
-            server: data.server,
-          });
-
-          // Tạo phiên mới
-          await this.CreateNewMiniGame({
-            server: data.server,
-            uuid: data.uuid,
-            lastResult: values.join('-'),
-            timeEnd: this.addSeconds(new Date(), seconds),
-          });
-          return;
         } else {
-          let isMissSession = seconds <= 280;
-          if (isMissSession) {
-            // Tìm các phiên bị miss và refund tiền cho người chơi
-            await this.cancelBetMinigame({
-              betId: oldSession.id,
-              server: oldSession.server,
-            });
-            // save lại phiên cũ và trả kết quả là refund
-            oldSession.result = 'refund';
+          throw new Error(
+            `BET is not the current session: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
+          );
+        }
+      } else {
+        // Xử lý phiên cũ gần nhất nếu không có phiên hoạt động
+        const oldSession = await this.miniGameModel
+          .findOne({ ...serverQuery, isEnd: true })
+          .sort({ updatedAt: -1 });
+
+        if (oldSession) {
+          if (seconds === 0)
+            throw new Error(
+              `BET till show result Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
+            );
+          // Xử lý và tìm phiên chưa được xử lý kết quả
+          // Kiểm tra và cập nhật phiên hiện tại
+          // Kiểm tra 1 kết quả gần nhất
+          const lastResult = oldSession.lastResult.split('-');
+          isNextSession = seconds <= 280 && values[1] === lastResult[0];
+
+          if (isNextSession) {
+            // Lưu phiên cũ và tiến hành trả kết quả cho Clients
+            oldSession.result = result;
             await oldSession.save();
+            await this.givePrizesToWinerMiniGameClient({
+              betId: oldSession.id,
+              result: result,
+              server: data.server,
+            });
+
             // Tạo phiên mới
             await this.CreateNewMiniGame({
               server: data.server,
@@ -672,19 +664,40 @@ export class MiddleEventService {
               timeEnd: this.addSeconds(new Date(), seconds),
             });
             return;
+          } else {
+            let isMissSession = seconds <= 280;
+            if (isMissSession) {
+              // Tìm các phiên bị miss và refund tiền cho người chơi
+              await this.cancelBetMinigame({
+                betId: oldSession.id,
+                server: oldSession.server,
+              });
+              // save lại phiên cũ và trả kết quả là refund
+              oldSession.result = 'refund';
+              await oldSession.save();
+              // Tạo phiên mới
+              await this.CreateNewMiniGame({
+                server: data.server,
+                uuid: data.uuid,
+                lastResult: values.join('-'),
+                timeEnd: this.addSeconds(new Date(), seconds),
+              });
+              return;
+            }
+            throw new Error(
+              `BET Delay: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
+            );
           }
-          throw new Error(
-            `BET Delay: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
-          );
+        } else {
+          // Tạo phiên mới nếu không có phiên hoạt động và không có phiên cũ
+          await this.CreateNewMiniGame({
+            server: data.server,
+            uuid: data.uuid,
+            lastResult: values.join('-'),
+            timeEnd: this.addSeconds(new Date(), seconds),
+          });
+          return;
         }
-      } else {
-        // Tạo phiên mới nếu không có phiên hoạt động và không có phiên cũ
-        await this.CreateNewMiniGame({
-          server: data.server,
-          uuid: data.uuid,
-          lastResult: values.join('-'),
-          timeEnd: this.addSeconds(new Date(), seconds),
-        });
       }
     } catch (err: any) {
       this.logger.log(`Err: ${err.message}`);
