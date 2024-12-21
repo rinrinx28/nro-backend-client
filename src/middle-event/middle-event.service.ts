@@ -602,7 +602,7 @@ export class MiddleEventService {
             return;
           } else {
             // Check update time
-            if (now - current_update < 1) {
+            if (now - current_update < 10) {
               throw new Error(
                 `SPAM BET: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
               );
