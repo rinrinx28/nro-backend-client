@@ -593,7 +593,7 @@ export class MiddleEventService {
               .findByIdAndUpdate(
                 latestSession.id,
                 { isEnd: true },
-                { new: true },
+                { new: true, upsert: true },
               )
               .exec();
             this.socketGateway.server.emit('mini.bet', {
@@ -625,6 +625,27 @@ export class MiddleEventService {
             return;
           }
         } else {
+          // save lại phiên cũ và trả kết quả là refund
+          const updatedSession = await this.miniGameModel.findByIdAndUpdate(
+            latestSession.id,
+            { isEnd: true, result: 'refund' },
+            { new: true, upsert: true },
+          );
+          this.socketGateway.server.emit('mini.bet', {
+            n_game: updatedSession.toObject(),
+          });
+          // Tìm các phiên bị miss và refund tiền cho người chơi
+          await this.cancelBetMinigame({
+            betId: latestSession.id,
+            server: latestSession.server,
+          });
+          // Tạo phiên mới
+          await this.CreateNewMiniGame({
+            server: data.server,
+            uuid: data.uuid,
+            lastResult: values.join('-'),
+            timeEnd: this.addSeconds(new Date(), seconds),
+          });
           throw new Error(
             `BET is not the current session: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
           );
