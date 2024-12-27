@@ -74,7 +74,7 @@ export class ServiceService {
         new Date(`${cronJob.cancelTime}`).getTime() / 1000,
       );
       let timeDiff = timeEnd - current;
-      if (timeDiff <= 60) {
+      if (timeDiff <= 120 && ['0', '1'].includes(service.type)) {
         throw new Error('giao dich da khoa, xin tạo lại tại nrogam e.m e');
       }
       this.logger.log(
