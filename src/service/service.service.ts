@@ -45,7 +45,11 @@ export class ServiceService {
   private logger: Logger = new Logger('Service');
   private readonly mutexMap = new Map<string, Mutex>();
 
-  async getServiceWithPlayerName(playerName: string, server: string) {
+  async getServiceWithPlayerName(
+    playerName: string,
+    server: string,
+    player_id: string,
+  ) {
     const parameter = `${playerName}.getServiceWithPlayerName`; // Value will be lock
 
     // Create mutex if it not exist
@@ -65,6 +69,11 @@ export class ServiceService {
       if (!service) throw new Error('bạn chưa tạo giao dịch tại nrogam e.m e');
 
       if (service.isEnd)
+        throw new Error(
+          'giao dịch của bạn bị hủy, xin tạo lại tại nrogam e.m e',
+        );
+
+      if (service.playerId !== '' && service.playerId !== player_id)
         throw new Error(
           'giao dịch của bạn bị hủy, xin tạo lại tại nrogam e.m e',
         );

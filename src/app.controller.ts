@@ -96,6 +96,7 @@ export class AppController {
         const service = await this.service.getServiceWithPlayerName(
           playerName,
           server,
+          player_id,
         );
         if (typeof service === 'string') return `no|${service}`;
         const { _id, type, amount } = service;
