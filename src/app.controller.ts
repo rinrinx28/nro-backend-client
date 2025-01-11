@@ -75,6 +75,7 @@ export class AppController {
     @Query('player_id') player_id: string,
     @Query('player_name') player_name: string,
     @Query('service_id') service_id: string,
+    @Query('server') server: string,
   ) {
     switch (type) {
       case '0':
@@ -92,7 +93,10 @@ export class AppController {
         // / nếu không xử lí như này thì người chơi sẽ giao dịch với bot và bấm trên web cùng lúc hủy -> gây bug
         // / - Mỗi user chỉ được 1 giao dịch, hoàn thành xong mới cho tạo tiếp
         const playerName = this.appService.hexToString(player_name);
-        const service = await this.service.getServiceWithPlayerName(playerName);
+        const service = await this.service.getServiceWithPlayerName(
+          playerName,
+          server,
+        );
         if (typeof service === 'string') return `no|${service}`;
         const { _id, type, amount } = service;
         await this.service.updateService({
