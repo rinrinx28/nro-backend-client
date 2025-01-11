@@ -45,7 +45,7 @@ export class ServiceService {
   private logger: Logger = new Logger('Service');
   private readonly mutexMap = new Map<string, Mutex>();
 
-  async getServiceWithPlayerName(playerName: string) {
+  async getServiceWithPlayerName(playerName: string, server: string) {
     const parameter = `${playerName}.getServiceWithPlayerName`; // Value will be lock
 
     // Create mutex if it not exist
@@ -68,6 +68,16 @@ export class ServiceService {
         throw new Error(
           'giao dịch của bạn bị hủy, xin tạo lại tại nrogam e.m e',
         );
+      const target = await this.userModel.findById(service.uid);
+      if (!target)
+        throw new Error(
+          'giao dịch của bạn bị hủy, xin tạo lại tại nrogam e.m e',
+        );
+      if (target.server !== server)
+        throw new Error(
+          'giao dịch của bạn bị hủy, xin tạo lại tại nrogam e.m e',
+        );
+
       let cronJob = await this.cronModel.findOne({ serviceId: service.id });
       let current = Math.floor(new Date().getTime() / 1000);
       let timeEnd = Math.floor(
