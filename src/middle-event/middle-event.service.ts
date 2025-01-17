@@ -576,7 +576,6 @@ export class MiddleEventService {
       const latestSession = await this.miniGameModel
         .findOne({ ...serverQuery, isEnd: false })
         .sort({ updatedAt: -1 });
-      let isNextSession = false;
 
       if (latestSession) {
         let now = moment().unix();
@@ -614,6 +613,7 @@ export class MiddleEventService {
                 {
                   result: '',
                   lastResult: values.join('-'),
+                  timeEnd: this.addSeconds(new Date(), seconds),
                 },
                 { new: true, upsert: true },
               )
@@ -654,6 +654,8 @@ export class MiddleEventService {
         const oldSession = await this.miniGameModel
           .findOne({ ...serverQuery, isEnd: true })
           .sort({ updatedAt: -1 });
+
+        let isNextSession = false;
 
         if (oldSession) {
           if (seconds === 0)
