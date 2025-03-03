@@ -97,207 +97,115 @@ export class MiddleEventService {
     }
   }
 
+  // Update Code by Grok AI
   @OnEvent('mini.server.24', { async: true })
   async handleMiniServer24(status: string) {
     try {
-      // let check old mini game;
+      // Note: Tìm game cũ chưa kết thúc để xử lý, ưu tiên game mới nhất dựa trên updatedAt
       let old_game = await this.miniGameModel
         .findOne({ isEnd: false, server: '24' })
         .sort({ updatedAt: -1 });
-      // Fisrt time run system or out range time end!
+
+      // Note: Nếu không có old_game (lần đầu chạy hoặc hết thời gian), tạo game mới
       if (!old_game) {
-        let old_r_game = await this.resultMiniGameModel
+        // Note: Lấy 10 kết quả mini game gần nhất để hiển thị lịch sử
+        const old_r_game = await this.resultMiniGameModel
           .find()
           .sort({ updatedAt: -1 })
           .limit(10);
-        let n_game = await this.handlerCreate({
+
+        // Note: Tạo game mới với thời gian kết thúc sau 60 giây
+        const n_game = await this.handlerCreate({
           server: '24',
           timeEnd: this.addSeconds(new Date(), 60),
           uuid: 'local',
-          lastResult: old_r_game.map((r) => r.result).join('-'),
+          lastResult: old_r_game.map((r) => r.result).join('-'), // Lịch sử kết quả dạng chuỗi
         });
-        const payload = {
+
+        // Note: Gửi thông tin game mới qua socket tới tất cả client
+        this.socketGateway.server.emit('mini.bet', {
           n_game: n_game.toObject(),
-        };
-        this.socketGateway.server.emit('mini.bet', payload);
-        return;
+        });
+        return; // Thoát hàm sau khi tạo game mới
       }
-      // If have old_game;
+
+      // Note: Nếu có old_game, lấy kết quả từ resultMiniGameModel
       const res = await this.resultMiniGameModel.findOne({
         miniId: old_game.id,
       });
-      // save isEnd;
+      if (!res)
+        throw new Error('Đã xảy ra lỗi đối với hệ thống tính toán phần thưởng'); // Note: Kiểm tra lỗi nếu không tìm thấy kết quả
+
+      // Note: Đánh dấu game cũ là đã kết thúc và lưu kết quả
       old_game.isEnd = true;
       old_game.result = res.result;
       await old_game.save();
-      const s_res = this.showResult(res.result);
-      // Let send prizes to winers;
-      const e_bet = await this.eConfigModel.findOne({ name: 'e_bet' });
-      let { cl = 1.95, x = 3.2, g = 70 } = e_bet.option;
 
-      // Let list user join the BET;
-      let users: {
-        uid: string;
-        revice: number;
-        place: string;
-        amount: number;
-      }[] = [];
-      let userBets = [];
-      let users_bet = await this.userBetModel.find({
+      // Note: Chuyển đổi kết quả thành định dạng hiển thị (e.g., "12_[kq]")
+      const s_res = this.showResult(res.result);
+
+      // Note: Lấy cấu hình tỷ lệ cược từ eConfigModel
+      const e_bet = await this.eConfigModel.findOne({ name: 'e_bet' });
+      const { cl = 1.95, x = 3.2, g = 70 } = e_bet.option; // Default values nếu không có config
+
+      // Note: Lấy tất cả user bet chưa kết thúc trong game này
+      const users_bet = await this.userBetModel.find({
         betId: old_game.id,
         isEnd: false,
       });
-      let notices: string[] = [];
-      // Find Winer and save user bet;
-      for (const user_bet of users_bet) {
-        const { place, typeBet, amount, uid } = user_bet;
 
-        let rate;
-        let isWinner = false;
+      // Note: Cập nhật tất cả user bets đồng thời và tìm người thắng
+      const { userBets, users } = await this.updateUserBets(
+        users_bet,
+        res,
+        cl,
+        x,
+        g,
+        s_res,
+      );
 
-        if (typeBet === 'cl') {
-          rate = cl;
-          let isRes = parseInt(res.result, 10);
-          if (isRes % 2 === 0 && place === 'C') {
-            isWinner = true;
-          }
-          if (isRes % 2 !== 0 && place === 'L') {
-            isWinner = true;
-          }
-          if (isRes <= 49 && place === 'X') {
-            isWinner = true;
-          }
-          if (isRes >= 50 && place === 'T') {
-            isWinner = true;
-          }
-        } else if (typeBet === 'x') {
-          rate = x;
-          isWinner = s_res.split('_')[0] === place;
-        } else {
-          rate = g;
-          isWinner = s_res.split('_')[1] === place;
-        }
-
-        if (isWinner) {
-          user_bet.revice = amount * rate;
-          users.push({
-            uid,
-            revice: user_bet.revice,
-            place,
-            amount,
-          });
-        }
-        // Update the user_bet status and fields
-        user_bet.isEnd = true;
-        user_bet.status = 2;
-        user_bet.result = res.result;
-        await user_bet.save();
-        userBets.push(user_bet.toObject());
-      }
-
-      // Get user data of list winer;
-      let users_res: { _id: string; money: number }[] = [];
-      let userActives: { uid: string; active: Record<string, any> }[] = [];
-      let clans: { clanId: string; score: number }[] = [];
+      // Note: Lấy thông tin user từ danh sách người thắng
       const list_user = await this.userModel.find({
-        _id: {
-          $in: users.map((u) => u.uid),
-        },
+        _id: { $in: users.map((u) => u.uid) },
       });
-      for (const user of list_user) {
-        const winner = users.filter((u) => u.uid === user.id);
-        for (const w of winner) {
-          const { revice } = w;
 
-          // Cập nhật thông tin active cho người chơi thắng cược
-          userActives.push({
-            uid: user.id,
-            active: {
-              name: 'winer_bet',
-              betId: old_game.id,
-              m_current: user.money,
-              m_new: user.money + revice,
-              place: w.place,
-              server: old_game.server,
-              amount: w.amount,
-            },
-          });
+      // Note: Cập nhật tiền, meta, clan và lưu hoạt động của user
+      const { userActives, clans, users_res } = await this.updateUsersAndClans(
+        users,
+        list_user,
+      );
 
-          // Cập nhật tiền và meta cho user
-          user.money += revice;
-          user.meta.totalTrade += revice; // Cập nhật tổng giao dịch
-          user.meta.limitTrade += revice; // Cập nhật limitedTrade
-          let { clanId = null } = user.meta; // Kiểm tra clanId từ meta
-
-          // Cập nhật điểm cho clan nếu có clanId
-          if (clanId) {
-            user.meta.score += revice; // Cập nhật tổng điểm của user
-            let clan = clans.findIndex((c) => c.clanId === clanId);
-            if (clan < 0) {
-              clans.push({ clanId, score: revice });
-            } else {
-              clans[clan].score += revice;
-            }
-          }
-
-          // Đánh dấu trường meta đã thay đổi
-          user.markModified('meta');
-
-          // Lưu user vào database
-          try {
-            await user.save();
-            console.log(`Cập nhật thành công cho user: ${user.id}`);
-          } catch (err) {
-            console.error(`Lỗi khi lưu user ${user.id}:`, err);
-          }
-
-          // Tạo thông báo cho người thắng cược
-          let convert_key = this.convert_key(w.place);
-          if (w.amount >= 5e8) {
-            notices.push(
-              `Chúc mừng người chơi ${user.name} đã thắng lớn ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
-            );
-          }
-        }
-
-        // Đưa kết quả cuối cùng của người dùng vào users_res
-        users_res.push({ _id: user.id, money: user.money });
-      }
-
-      // Save clan;
-      const bulkOps_clan = clans.map((clan) => ({
+      // Note: Cập nhật điểm clan bằng bulkWrite để tối ưu hiệu suất
+      const bulkOpsClan = clans.map((clan) => ({
         updateOne: {
-          filter: { _id: clan.clanId }, // Filter by clanId
-          update: { $inc: { score: +clan.score } }, // Update score
+          filter: { _id: clan.clanId },
+          update: { $inc: { score: clan.score } },
         },
       }));
-      const clans_bulk = await this.clanModel.bulkWrite(bulkOps_clan);
+      // Note: Thực hiện cập nhật clans và user activities song song, đảm bảo userActives luôn chạy kể cả khi không có clans
+      const clans_bulk_promise = bulkOpsClan.length
+        ? this.clanModel.bulkWrite(bulkOpsClan) // Note: Chỉ cập nhật clan nếu có dữ liệu
+        : Promise.resolve(null); // Note: Trả về null nếu không có clan để cập nhật
 
-      // Save active
-      await this.userActiveModel.insertMany(userActives);
+      const active_promise = userActives.length
+        ? this.userActiveModel.insertMany(userActives) // Note: Lưu tất cả activity nếu có
+        : Promise.resolve([]); // Note: Trả về mảng rỗng nếu không có activity
 
-      // Send notice result;
-      let split_res = s_res.split('_');
-      let res_key = this.show_result_text(split_res[0]);
-      await this.sendNotiSystem({
-        content: `Máy chủ 24: Chúc mừng những người chơi đã chọn ${res_key}_${split_res[1]}`,
-        server: old_game.server,
-        uid: 'local',
-      });
+      // Note: Chờ cả hai promise hoàn tất, nhưng không phụ thuộc lẫn nhau
+      const [clans_bulk, active_result] = await Promise.all([
+        clans_bulk_promise,
+        active_promise,
+      ]);
 
-      // Send notice;
-      if (notices.length > 0) {
-        await this.sendNotiSystem({
-          content: 'Xin chức mừng những người chơi sau:\n' + notices.join('\n'),
-          server: old_game.server,
-          uid: 'local',
-        });
-      }
-      // Send jackpot:
+      // Note: Gửi thông báo kết quả và thông báo thắng lớn qua hệ thống
+      await this.sendNotifications(old_game, s_res, users);
+
+      // Note: Nếu kết quả là "99", kích hoạt jackpot
       if (res.result === '99') {
         await this.sendJackpot({ server: '24', betId: old_game.id });
       }
-      // Create new Bet 24
+
+      // Note: Tạo game mới sau khi xử lý xong game cũ
       const last_res = await this.resultMiniGameModel
         .find()
         .sort({ updatedAt: -1 })
@@ -308,17 +216,192 @@ export class MiddleEventService {
         uuid: 'local',
         lastResult: last_res.map((r) => r.result).join('-'),
       });
+
+      // Note: Chuẩn bị payload để gửi qua socket: game mới, kết quả bet, thông tin user
       const payload = {
         n_game: n_game.toObject(),
-        userBets: userBets,
-        data_user: users_res,
+        userBets, // Danh sách các bet đã cập nhật
+        data_user: users_res, // Thông tin user sau khi cập nhật tiền
       };
+
+      // Note: Gửi thông tin cập nhật qua socket cho client
       this.socketGateway.server.emit('mini.bet', payload);
-      this.socketGateway.server.emit('clan.update.bulk', clans_bulk);
-      return payload;
+
+      // Note: Clans hiện đang không kích hoạt trên FE
+      // if (clans_bulk) {
+      //   this.socketGateway.server.emit('clan.update.bulk', clans_bulk); // Note: Cập nhật clan cho client
+      // }
+
+      return payload; // Note: Trả về payload để debug hoặc xử lý tiếp nếu cần
     } catch (err: any) {
-      this.logger.log(`Err BET 24: Msg: ${err.message} - Main Func`);
-      return err.message;
+      // Note: Ghi log lỗi tổng quát để dễ dàng theo dõi khi debug
+      this.logger.log(`Err BET 24: ${err.message} - Stack: ${err.stack}`);
+      throw err; // Note: Ném lỗi để caller xử lý hoặc dừng luồng
+    }
+  }
+
+  // Note: Hàm phụ để cập nhật user bets và tìm người thắng
+  async updateUserBets(
+    users_bet: any[],
+    res: any,
+    cl: number,
+    x: number,
+    g: number,
+    s_res: string,
+  ) {
+    const userBets: any[] = [];
+    const users: {
+      uid: string;
+      revice: number;
+      place: string;
+      amount: number;
+    }[] = [];
+
+    // Note: Dùng Promise.all để xử lý đồng thời tất cả user bets
+    const updatePromises = users_bet.map(async (user_bet) => {
+      const { place, typeBet, amount, uid } = user_bet;
+      let rate: number;
+      let isWinner = false;
+
+      // Note: Xác định tỷ lệ và điều kiện thắng dựa trên loại cược
+      if (typeBet === 'cl') {
+        rate = cl;
+        const isRes = parseInt(res.result, 10);
+        if (isRes % 2 === 0 && place === 'C')
+          isWinner = true; // Chẵn
+        else if (isRes % 2 !== 0 && place === 'L')
+          isWinner = true; // Lẻ
+        else if (isRes <= 49 && place === 'X')
+          isWinner = true; // Xỉu
+        else if (isRes >= 50 && place === 'T') isWinner = true; // Tài
+      } else if (typeBet === 'x') {
+        // Xiên
+        rate = x;
+        isWinner = s_res.split('_')[0] === place; // Note: So sánh với phần đầu của kết quả
+      } else {
+        // Dự đoán số
+        rate = g;
+        isWinner = s_res.split('_')[1] === place; // Note: So sánh với phần sau của kết quả
+      }
+
+      // Note: Nếu thắng, tính tiền thưởng và thêm vào danh sách người thắng
+      if (isWinner) {
+        user_bet.revice = amount * rate;
+        users.push({ uid, revice: user_bet.revice, place, amount });
+      }
+
+      // Note: Cập nhật trạng thái bet (đã kết thúc) và lưu vào DB
+      user_bet.isEnd = true;
+      user_bet.status = 2; // Note: Status 2 biểu thị bet đã hoàn tất
+      user_bet.result = res.result;
+      await user_bet.save();
+      userBets.push(user_bet.toObject());
+    });
+
+    await Promise.all(updatePromises);
+    return { userBets, users };
+  }
+
+  // Note: Hàm phụ để cập nhật thông tin user và clan, hỗ trợ user thắng nhiều userbet
+  async updateUsersAndClans(users: any[], list_user: any[]) {
+    const userActives: any[] = [];
+    const clans: { clanId: string; score: number }[] = [];
+    const users_res: { _id: string; money: number }[] = [];
+
+    // Note: Tạo map để gộp tất cả khoản thắng của từng user theo uid
+    const winningsByUser = new Map<
+      string,
+      { totalRevice: number; wins: any[] }
+    >();
+    for (const win of users) {
+      const { uid, revice, place, amount } = win;
+      if (winningsByUser.has(uid)) {
+        const existing = winningsByUser.get(uid)!;
+        existing.totalRevice += revice;
+        existing.wins.push({ revice, place, amount });
+      } else {
+        winningsByUser.set(uid, {
+          totalRevice: revice,
+          wins: [{ revice, place, amount }],
+        });
+      }
+    }
+
+    // Note: Dùng Promise.all để cập nhật đồng thời tất cả user
+    const updatePromises = list_user.map(async (user) => {
+      const userWins = winningsByUser.get(user.id);
+      if (userWins) {
+        const { totalRevice, wins } = userWins;
+
+        // Note: Cộng tổng tiền thưởng từ tất cả userbet thắng vào tài khoản
+        user.money += totalRevice;
+        user.meta.totalTrade += totalRevice; // Note: Cập nhật tổng giao dịch
+        user.meta.limitTrade += totalRevice; // Note: Cập nhật giới hạn giao dịch
+
+        // Note: Nếu user thuộc clan, cập nhật điểm clan dựa trên tổng tiền thắng
+        if (user.meta.clanId) {
+          user.meta.score += totalRevice;
+          const clanIdx = clans.findIndex((c) => c.clanId === user.meta.clanId);
+          if (clanIdx > 0) {
+            clans[clanIdx].score += totalRevice;
+          }
+        }
+
+        // Note: Đánh dấu meta đã thay đổi để mongoose lưu đúng
+        user.markModified('meta');
+        await user.save();
+
+        // Note: Thêm thông tin user vào kết quả trả về
+        users_res.push({ _id: user.id, money: user.money });
+
+        // Note: Ghi lại hoạt động cho từng session thắng của user
+        wins.forEach((win) => {
+          userActives.push({
+            uid: user.id,
+            active: {
+              name: 'winer_bet', // Ví dụ thông tin hoạt động
+              m_current: user.money - totalRevice, // Tiền trước khi thắng
+              m_new: user.money, // Tiền sau khi thắng
+              place: win.place,
+              amount: win.amount,
+              revice: win.revice,
+            },
+          });
+        });
+      }
+    });
+
+    // Note: Chờ tất cả cập nhật hoàn tất
+    await Promise.all(updatePromises);
+
+    return { userActives, clans, users_res };
+  }
+
+  // Note: Hàm phụ để gửi thông báo qua hệ thống
+  async sendNotifications(old_game: any, s_res: string, users: any[]) {
+    const split_res = s_res.split('_');
+    const res_key = this.show_result_text(split_res[0]);
+
+    // Note: Gửi thông báo kết quả chung cho tất cả người chơi
+    await this.sendNotiSystem({
+      content: `Máy chủ 24: Chúc mừng những người chơi đã chọn ${res_key}_${split_res[1]}`,
+      server: old_game.server,
+      uid: 'local',
+    });
+
+    // Note: Tạo và gửi thông báo cho người thắng lớn (nếu có)
+    const notices = users
+      .filter((w) => w.amount >= 5e8)
+      .map(
+        (w) =>
+          `Chúc mừng người chơi đã thắng ${new Intl.NumberFormat('vi').format(w.revice)} vàng vào ${this.convert_key(w.place)}`,
+      );
+    if (notices.length > 0) {
+      await this.sendNotiSystem({
+        content: 'Xin chúc mừng những người chơi sau:\n' + notices.join('\n'),
+        server: old_game.server,
+        uid: 'local',
+      });
     }
   }
 
@@ -371,7 +454,7 @@ export class MiddleEventService {
   }
 
   generateResult() {
-    return Math.floor(Math.random() * (98 - 0 + 1)) + 0;
+    return Math.floor(Math.random() * (98 - 0 + 1)) + 0; // 0 -> 98
   }
 
   addSeconds(date: Date, seconds: number): Date {
@@ -388,132 +471,176 @@ export class MiddleEventService {
   }
 
   //TODO ———————————————[Jackpot Sv 24]———————————————
-  async sendJackpot(payload: { server: string; betId: string }) {
+  // Note: Hàm xử lý trao thưởng jackpot cho người thắng trong phiên mini game
+  async sendJackpot(payload: { server: string; betId: string }): Promise<void> {
     try {
       const { server, betId } = payload;
-      // Find jackpot;
-      const e_bet = await this.eConfigModel.findOne({ name: 'e_bet' });
-      const jackpot = await this.JackpotModel.findOne({ server });
-      if (!jackpot) throw new Error('');
 
-      // Find all userBet;
-      const userBets = await this.userBetModel.find({
-        betId: betId,
-        status: 2,
-        isEnd: true,
-        server: '24',
-      });
+      // Note: Tải dữ liệu cần thiết song song để giảm thời gian chờ
+      const [e_bet, jackpot, userBets] = await Promise.all([
+        this.eConfigModel.findOne({ name: 'e_bet' }), // Note: Lấy cấu hình tỷ lệ cược
+        this.JackpotModel.findOne({ server }), // Note: Lấy thông tin jackpot của server
+        this.userBetModel.find({ betId, status: 2, isEnd: true, server: '24' }), // Note: Lấy các cược đã kết thúc và thắng
+      ]);
 
-      // filter userbet is winer;
-      const user_bet_winer = userBets.filter((u) => u.revice > 0);
-      const total_bet_winer = userBets
-        .filter((u) => u.revice > 0)
-        .reduce((sum, b) => sum + (b.amount ?? 0), 0);
+      if (!jackpot)
+        throw new Error(`Jackpot không tồn tại cho server: ${server}`);
+      if (!e_bet) throw new Error('Cấu hình e_bet không tồn tại');
 
-      // Config Jackpot;
-      const prizes = jackpot.score * (e_bet.option.jackpot ?? 0.05);
-      let store_user_winer: { uid: string; score: number; precent?: number }[] =
-        [];
-      for (const user of user_bet_winer) {
-        let index = store_user_winer.findIndex((u) => u?.uid === user.uid);
-        if (index < 0) {
-          store_user_winer.push({
-            uid: user.uid,
-            score: user.amount,
-          });
+      // Note: Lọc người thắng (có revice > 0) và tính tổng số tiền cược của họ
+      const user_bet_winners = userBets.filter((u) => u.revice > 0);
+      const total_bet_winners = user_bet_winners.reduce(
+        (sum, b) => sum + (b.amount ?? 0),
+        0,
+      );
+
+      if (user_bet_winners.length === 0) {
+        this.logger.log(`Không có người thắng jackpot cho betId: ${betId}`);
+        return; // Note: Thoát nếu không có người thắng
+      }
+
+      // Note: Tính tổng giải thưởng jackpot dựa trên cấu hình
+      const jackpotPrize = jackpot.score * (e_bet.option.jackpot ?? 0.05);
+
+      // Note: Gộp tiền cược của cùng một user bằng Map để xử lý trường hợp thắng nhiều lần
+      const winnersByUser = new Map<
+        string,
+        { score: number; precent?: number }
+      >();
+      user_bet_winners.forEach((user) => {
+        const existing = winnersByUser.get(user.uid);
+        if (existing) {
+          existing.score += user.amount;
         } else {
-          store_user_winer[index].score += user.amount;
+          winnersByUser.set(user.uid, { score: user.amount });
         }
-      }
-
-      // Find percent of user;
-      for (let i = 0; i < store_user_winer.length; i++) {
-        let percent = total_bet_winer / store_user_winer[i].score;
-        store_user_winer[i].precent = percent;
-      }
-
-      let list_u_up = store_user_winer.map((s) => {
-        return this.userModel.findByIdAndUpdate(s.uid, {
-          $inc: {
-            money: +s.precent * prizes,
-          },
-        });
       });
 
-      const updateUsers = await Promise.all(list_u_up);
-
-      let list_u_active = updateUsers.map((up) => {
-        let winer_u = store_user_winer.find((u) => u.uid === up.id);
-        let m_current = up.money - winer_u.precent * prizes;
-        let m_new = up.money;
-        return this.userActiveModel.create({
-          uid: up.id,
-          active: {
-            name: 'win_jackpot',
-            m_current,
-            m_new,
-          },
-        });
+      // Note: Tính tỷ lệ phần trăm đóng góp của từng user so với tổng cược
+      winnersByUser.forEach((winner) => {
+        winner.precent = winner.score / total_bet_winners; // Note: Tỷ lệ = tiền cược cá nhân / tổng cược
       });
 
-      await Promise.all(list_u_active);
+      // Note: Lấy thông tin user và chuẩn bị bulk update
+      const list_user = await this.userModel.find({
+        _id: { $in: Array.from(winnersByUser.keys()) },
+      });
+      const userBulkOps: any[] = [];
+      const activeBulkOps: any[] = [];
+      const res_u_s: { _id: string; money: number; meta: any }[] = [];
+      const list_notice_u: string[] = [];
 
-      let res_u_s = updateUsers.map((up) => {
-        let { _id, money, meta } = up.toObject();
-        return { _id, money, meta };
+      list_user.forEach((user) => {
+        const winner = winnersByUser.get(user.id);
+        if (winner) {
+          const prize = (winner.precent || 0) * jackpotPrize; // Note: Tiền thưởng = tỷ lệ x tổng giải
+
+          // Note: Chuẩn bị bulkWrite để cộng tiền thưởng vào tiền user
+          userBulkOps.push({
+            updateOne: {
+              filter: { _id: user.id },
+              update: { $inc: { money: prize } },
+            },
+          });
+
+          // Note: Chuẩn bị dữ liệu trả về
+          res_u_s.push({
+            _id: user.id,
+            money: user.money + prize,
+            meta: user.meta,
+          });
+
+          // Note: Ghi hoạt động thắng jackpot
+          activeBulkOps.push({
+            insertOne: {
+              document: {
+                uid: user.id,
+                active: {
+                  name: 'win_jackpot',
+                  m_current: user.money, // Note: Tiền trước khi nhận thưởng
+                  m_new: user.money + prize, // Note: Tiền sau khi nhận thưởng
+                  betId,
+                  prize,
+                },
+              },
+            },
+          });
+
+          // Note: Tạo thông báo cho từng người thắng
+          list_notice_u.push(
+            `Người chơi ${user.name} đã trúng Jackpot ${new Intl.NumberFormat('vi').format(prize)} vàng`,
+          );
+        }
       });
 
-      let list_notice_u = updateUsers.map((up) => {
-        let winer_u = store_user_winer.find((u) => u.uid === up.id);
-        let prize = winer_u.precent * prizes;
-        return `Nguời chơi ${up.name} đã trúng Jackpot ${new Intl.NumberFormat('vi').format(prize)} vàng`;
-      });
+      // Note: Thực hiện tất cả cập nhật database song song
+      const [user_bulk_result, active_bulk_result] = await Promise.all([
+        userBulkOps.length
+          ? this.userModel.bulkWrite(userBulkOps)
+          : Promise.resolve(null), // Note: Cập nhật user
+        activeBulkOps.length
+          ? this.userActiveModel.bulkWrite(activeBulkOps)
+          : Promise.resolve(null), // Note: Lưu activity
+      ]);
 
+      // Note: Gửi thông báo hệ thống nếu có người thắng
       if (list_notice_u.length > 0) {
         await this.sendNotiSystem({
           content:
             'Xin chúc mừng những người chơi sau:\n' + list_notice_u.join('\n'),
-          server: 'all',
+          server: 'all', // Note: Gửi thông báo tới tất cả server
           uid: 'local',
         });
       }
-      this.socketGateway.server.emit('user.update.bulk', res_u_s);
 
-      // Save Jackpot;
-      jackpot.score -= prizes;
+      // Note: Phát sự kiện cập nhật user hàng loạt
+      if (user_bulk_result) {
+        this.socketGateway.server.emit('user.update.bulk', res_u_s);
+      }
+
+      // Note: Cập nhật jackpot sau khi trao thưởng
+      jackpot.score -= jackpotPrize;
       await jackpot.save();
+
+      // Note: Phát sự kiện cập nhật jackpot cho client
       this.socketGateway.server.emit('jackpot.update', jackpot.toObject());
-      this.logger.log('Send prizes Jackpot is Success!');
+
+      this.logger.log(
+        `Send Jackpot prizes completed for betId: ${betId} - Prize: ${jackpotPrize}`,
+      );
     } catch (err: any) {
-      this.logger.log(`Err Jackpot: ${err.message}`);
+      // Note: Ghi log lỗi chi tiết để debug
+      this.logger.log(
+        `Err Jackpot - BetId: ${payload.betId} - Server: ${payload.server} - Msg: ${err.message}`,
+      );
+      throw err; // Note: Ném lỗi để caller xử lý nếu cần
     }
   }
 
   //TODO ———————————————[Handler notice info]———————————————
-  extractValues(input: string) {
-    // Loại bỏ các ký tự đặc biệt (bao gồm cả các ký tự điều khiển và ký tự không in được)
+
+  // Note: Trích xuất số từ chuỗi đầu vào, loại bỏ ký tự đặc biệt
+  extractValues(input: string): {
+    result: string | null;
+    values: string[];
+    seconds: number | null;
+  } {
+    // Note: Loại bỏ ký tự không cần thiết, chỉ giữ chữ, số, khoảng trắng và dấu chấm
     const cleanedInput = input.replace(/[^\w\s.]/g, ' ').trim();
 
-    // Tách chuỗi thành các từ dựa trên khoảng trắng
+    // Note: Tách chuỗi thành mảng các từ
     const words = cleanedInput.split(/\s+/);
 
-    // Mảng lưu trữ các số tìm được
-    const numbers: string[] = [];
+    // Note: Lọc các từ là số có định dạng hợp lệ (VD: 123, 1.234.567)
+    const numbers = words
+      .filter((word) => /^\d{1,3}(\.\d{3})*$/.test(word))
+      .filter((n) => n !== '90.000.000'); // Note: Loại bỏ số không liên quan
 
-    // Duyệt qua các từ để tìm các số
-    for (let word of words) {
-      // Kiểm tra xem từ có phải là số có dấu chấm phân cách ngàn
-      if (/^\d{1,3}(\.\d{3})*$/.test(word)) {
-        numbers.push(word);
-      }
-    }
-
-    let number_filter = numbers.filter((n) => n !== '90.000.000');
-    let result = this.processNumbers(number_filter);
-
-    return result;
+    // Note: Xử lý mảng số để lấy result, values, seconds
+    return this.processNumbers(numbers);
   }
 
+  // Note: Xử lý mảng số để phân loại kết quả, giá trị lịch sử, và thời gian còn lại
   processNumbers(numbers: string[]): {
     result: string | null;
     values: string[];
@@ -524,39 +651,36 @@ export class MiddleEventService {
     let seconds: number | null = null;
 
     if (numbers.length === 1) {
-      // Nếu mảng chỉ có 1 số, đó chính là "giây"
+      // Note: Chỉ có 1 số -> coi đó là thời gian (seconds)
       seconds = parseInt(numbers[0], 10);
     } else if (numbers.length > 1) {
-      // Nếu mảng có nhiều hơn 1 số
-      seconds = parseInt(numbers[numbers.length - 1], 10); // Giá trị cuối cùng là "giây"
-
-      // Đảo ngược các giá trị giữa đầu và cuối mảng
-      values = numbers.slice(1, numbers.length - 1).reverse();
-
-      // Lấy giá trị cuối cùng trong mảng đảo ngược làm "kết quả trước"
+      // Note: Nhiều hơn 1 số: số cuối là seconds, số đầu là result, giữa là values
+      seconds = parseInt(numbers[numbers.length - 1], 10);
+      values = numbers.slice(1, numbers.length - 1).reverse(); // Note: Đảo ngược thứ tự values
       result = numbers[0];
     }
 
     return { result, values, seconds };
   }
 
-  async miniGameClient(data: IData) {
+  // Note: Hàm chính xử lý dữ liệu từ client và quản lý phiên mini game
+  async miniGameClient(data: IData): Promise<void> {
+    // Note: Kiểm tra đầu vào hợp lệ
     if (!data || !data.server || !data.content) {
       this.logger.error('Invalid data input');
       return;
     }
-    const parameter = `${data.server}.mini.info`; // Value will be lock
 
-    // Create mutex if it not exist
+    const parameter = `${data.server}.mini.info`; // Note: Khóa mutex cho server cụ thể
     if (!this.mutexMap.has(parameter)) {
-      this.mutexMap.set(parameter, new Mutex());
+      this.mutexMap.set(parameter, new Mutex()); // Note: Tạo mutex nếu chưa tồn tại
     }
 
-    const mutex = this.mutexMap.get(parameter);
+    const mutex = this.mutexMap.get(parameter)!;
     const release = await mutex.acquire();
     try {
+      // Note: Trích xuất thông tin từ content
       const parsedContent = this.extractValues(data.content);
-
       if (!parsedContent) {
         this.logger.error('Parsed content is null');
         return;
@@ -565,471 +689,417 @@ export class MiddleEventService {
       const { result, seconds, values } = parsedContent;
       const serverQuery = { server: data.server };
 
-      // Bỏ qua result = null
+      // Note: Bỏ qua nếu không có result (phiên đầu tiên hoặc dữ liệu không đầy đủ)
       if (!result) {
         throw new Error(
           `Skip First BET - Server: ${data.server} - Result: ${result} - Values: ${values} - Time: ${seconds}`,
         );
       }
 
-      // Tìm phiên đang hoạt động gần nhất
+      // Note: Tìm phiên đang hoạt động gần nhất
       const latestSession = await this.miniGameModel
         .findOne({ ...serverQuery, isEnd: false })
         .sort({ updatedAt: -1 });
 
       if (latestSession) {
-        let now = moment().unix();
-        let current_update = moment(`${latestSession.updatedAt}`).unix();
-        let timeEnd = moment(`${latestSession.timeEnd}`).unix();
-        // Kiểm tra và cập nhật phiên hiện tại
-        // Kiểm tra 1 kết quả gần nhất
-        const lastResult = latestSession.lastResult.split('-');
-        const isSession = values[0] === lastResult[0];
-        if (isSession) {
-          // Nếu thời gian còn lại là 0, đánh dấu phiên đã kết thúc
-          if (timeEnd - now <= 0 || seconds === 0) {
-            const updatedSession = await this.miniGameModel
-              .findByIdAndUpdate(
-                latestSession.id,
-                { isEnd: true },
-                { new: true, upsert: true },
-              )
-              .exec();
-            this.socketGateway.server.emit('mini.bet', {
-              n_game: updatedSession.toObject(),
-            });
-            return;
-          } else {
-            // Check update time
-            if (now - current_update < 10) {
-              throw new Error(
-                `SPAM BET: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
-              );
-            }
-            // Update phiên hiện tại
-            const updatedSession = await this.miniGameModel
-              .findByIdAndUpdate(
-                latestSession.id,
-                {
-                  result: '',
-                  lastResult: values.join('-'),
-                  timeEnd: this.addSeconds(new Date(), seconds),
-                },
-                { new: true, upsert: true },
-              )
-              .exec();
-            this.socketGateway.server.emit('mini.bet', {
-              n_game: updatedSession.toObject(),
-            });
-            return;
-          }
-        } else {
-          // save lại phiên cũ và trả kết quả là refund
-          const updatedSession = await this.miniGameModel.findByIdAndUpdate(
-            latestSession.id,
-            { isEnd: true, result: 'refund' },
-            { new: true, upsert: true },
-          );
-          this.socketGateway.server.emit('mini.bet', {
-            n_game: updatedSession.toObject(),
-          });
-          // Tìm các phiên bị miss và refund tiền cho người chơi
-          await this.cancelBetMinigame({
-            betId: latestSession.id,
-            server: latestSession.server,
-          });
-          // Tạo phiên mới
-          await this.CreateNewMiniGame({
-            server: data.server,
-            uuid: data.uuid,
-            lastResult: values.join('-'),
-            timeEnd: this.addSeconds(new Date(), seconds),
-          });
-          throw new Error(
-            `BET is not the current session: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
-          );
-        }
+        await this.handleActiveSession(latestSession, values, seconds, data);
       } else {
-        // Xử lý phiên cũ gần nhất nếu không có phiên hoạt động
-        const oldSession = await this.miniGameModel
-          .findOne({ ...serverQuery, isEnd: true })
-          .sort({ updatedAt: -1 });
-
-        let isNextSession = false;
-
-        if (oldSession) {
-          if (seconds === 0)
-            throw new Error(
-              `BET till show result Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
-            );
-          // Xử lý và tìm phiên chưa được xử lý kết quả
-          // Kiểm tra và cập nhật phiên hiện tại
-          // Kiểm tra 1 kết quả gần nhất
-          const lastResult = oldSession.lastResult.split('-');
-          isNextSession = seconds <= 280 && values[1] === lastResult[0];
-
-          if (isNextSession) {
-            // Lưu phiên cũ và tiến hành trả kết quả cho Clients
-            oldSession.result = result;
-            await oldSession.save();
-            await this.givePrizesToWinerMiniGameClient({
-              betId: oldSession.id,
-              result: result,
-              server: data.server,
-            });
-
-            // Tạo phiên mới
-            await this.CreateNewMiniGame({
-              server: data.server,
-              uuid: data.uuid,
-              lastResult: values.join('-'),
-              timeEnd: this.addSeconds(new Date(), seconds),
-            });
-            return;
-          } else {
-            let isMissSession = seconds <= 280;
-            if (isMissSession) {
-              // Tìm các phiên bị miss và refund tiền cho người chơi
-              await this.cancelBetMinigame({
-                betId: oldSession.id,
-                server: oldSession.server,
-              });
-              // save lại phiên cũ và trả kết quả là refund
-              oldSession.result = 'refund';
-              await oldSession.save();
-              // Tạo phiên mới
-              await this.CreateNewMiniGame({
-                server: data.server,
-                uuid: data.uuid,
-                lastResult: values.join('-'),
-                timeEnd: this.addSeconds(new Date(), seconds),
-              });
-              return;
-            }
-            throw new Error(
-              `BET Delay: Server: ${data.server} - Result: ${result} - Values: (${values}) - Time: <${seconds}>`,
-            );
-          }
-        } else {
-          // Tạo phiên mới nếu không có phiên hoạt động và không có phiên cũ
-          await this.CreateNewMiniGame({
-            server: data.server,
-            uuid: data.uuid,
-            lastResult: values.join('-'),
-            timeEnd: this.addSeconds(new Date(), seconds),
-          });
-          return;
-        }
+        await this.handleNoActiveSession(
+          serverQuery,
+          result,
+          values,
+          seconds,
+          data,
+        );
       }
     } catch (err: any) {
-      this.logger.log(`Err: ${err.message}`);
+      // Note: Ghi log lỗi chi tiết để debug
+      this.logger.log(
+        `Err MiniGameClient - Server: ${data.server} - Msg: ${err.message}`,
+      );
+      throw err; // Note: Ném lỗi để caller xử lý nếu cần
     } finally {
+      // Note: Giải phóng mutex sau khi hoàn tất
       release();
     }
   }
 
+  // Note: Xử lý phiên đang hoạt động
+  async handleActiveSession(
+    latestSession: any,
+    values: string[],
+    seconds: number,
+    data: IData,
+  ): Promise<void> {
+    const now = moment().unix();
+    const currentUpdate = moment(latestSession.updatedAt).unix();
+    const timeEnd = moment(latestSession.timeEnd).unix();
+    const lastResult = latestSession.lastResult.split('-');
+    const isSession = values[0] === lastResult[0]; // Note: Kiểm tra phiên có trùng với kết quả trước không
+
+    if (isSession) {
+      if (timeEnd - now <= 0 || seconds === 0) {
+        // Note: Đánh dấu phiên kết thúc nếu hết thời gian
+        const updatedSession = await this.miniGameModel.findByIdAndUpdate(
+          latestSession.id,
+          { isEnd: true },
+          { new: true, upsert: true },
+        );
+        this.socketGateway.server.emit('mini.bet', {
+          n_game: updatedSession.toObject(),
+        });
+      } else {
+        // Note: Ngăn spam: kiểm tra khoảng cách thời gian cập nhật
+        if (now - currentUpdate < 10) {
+          throw new Error(
+            `SPAM BET: Server: ${data.server} - Values: (${values}) - Time: <${seconds}>`,
+          );
+        }
+        // Note: Cập nhật phiên hiện tại với thông tin mới
+        const updatedSession = await this.miniGameModel.findByIdAndUpdate(
+          latestSession.id,
+          {
+            result: '',
+            lastResult: values.join('-'),
+            timeEnd: this.addSeconds(new Date(), seconds),
+          },
+          { new: true, upsert: true },
+        );
+        this.socketGateway.server.emit('mini.bet', {
+          n_game: updatedSession.toObject(),
+        });
+      }
+    } else {
+      // Note: Phiên không khớp -> hoàn tiền và tạo phiên mới
+      const refundSession = await this.miniGameModel.findByIdAndUpdate(
+        latestSession.id,
+        { isEnd: true, result: 'refund' },
+        { new: true, upsert: true },
+      );
+      this.socketGateway.server.emit('mini.bet', {
+        n_game: refundSession.toObject(),
+      });
+
+      // Note: Thực hiện refund song song
+      await Promise.all([
+        this.cancelBetMinigame({
+          betId: latestSession.id,
+          server: latestSession.server,
+        }),
+        this.CreateNewMiniGame({
+          server: data.server,
+          uuid: data.uuid,
+          lastResult: values.join('-'),
+          timeEnd: this.addSeconds(new Date(), seconds),
+        }),
+      ]);
+
+      throw new Error(
+        `BET is not the current session: Server: ${data.server} - Values: (${values}) - Time: <${seconds}>`,
+      );
+    }
+  }
+
+  // Note: Xử lý khi không có phiên hoạt động
+  async handleNoActiveSession(
+    serverQuery: any,
+    result: string,
+    values: string[],
+    seconds: number,
+    data: IData,
+  ): Promise<void> {
+    const oldSession = await this.miniGameModel
+      .findOne({ ...serverQuery, isEnd: true })
+      .sort({ updatedAt: -1 });
+
+    if (oldSession) {
+      if (seconds === 0) {
+        throw new Error(
+          `BET till show result Server: ${data.server} - Values: (${values}) - Time: <${seconds}>`,
+        );
+      }
+
+      const lastResult = oldSession.lastResult.split('-');
+      const isNextSession = seconds <= 280 && values[1] === lastResult[0]; // Note: Kiểm tra xem có phải phiên tiếp theo không
+
+      if (isNextSession) {
+        // Note: Cập nhật kết quả cho phiên cũ và trao thưởng
+        oldSession.result = result;
+        await Promise.all([
+          oldSession.save(),
+          this.givePrizesToWinerMiniGameClient({
+            betId: oldSession.id,
+            result: result,
+            server: data.server,
+          }),
+          this.CreateNewMiniGame({
+            server: data.server,
+            uuid: data.uuid,
+            lastResult: values.join('-'),
+            timeEnd: this.addSeconds(new Date(), seconds),
+          }),
+        ]);
+      } else {
+        const isMissSession = seconds <= 280;
+        if (isMissSession) {
+          // Note: Refund phiên bị miss và tạo phiên mới
+          oldSession.result = 'refund';
+          await Promise.all([
+            oldSession.save(),
+            this.cancelBetMinigame({
+              betId: oldSession.id,
+              server: oldSession.server,
+            }),
+            this.CreateNewMiniGame({
+              server: data.server,
+              uuid: data.uuid,
+              lastResult: values.join('-'),
+              timeEnd: this.addSeconds(new Date(), seconds),
+            }),
+          ]);
+        } else {
+          throw new Error(
+            `BET Delay: Server: ${data.server} - Values: (${values}) - Time: <${seconds}>`,
+          );
+        }
+      }
+    } else {
+      // Note: Không có phiên cũ -> tạo phiên mới
+      await this.CreateNewMiniGame({
+        server: data.server,
+        uuid: data.uuid,
+        lastResult: values.join('-'),
+        timeEnd: this.addSeconds(new Date(), seconds),
+      });
+    }
+  }
+
+  // Note: Hàm xử lý trao thưởng cho người thắng trong mini game, tận dụng các hàm phụ để tối ưu
   async givePrizesToWinerMiniGameClient(payload: {
     betId: string;
     result: string;
     server: string;
-  }) {
+  }): Promise<void> {
     try {
-      const { betId, result, server } = payload;
-      const old_game = await this.miniGameModel.findById(betId);
-      const s_res = this.showResult(result);
-      // Let send prizes to winers;
-      const e_bet = await this.eConfigModel.findOne({ name: 'e_bet' });
-      let { cl = 1.95, x = 3.2, g = 70 } = e_bet.option;
+      const { betId, result } = payload;
 
-      let users: {
-        uid: string;
-        revice: number;
-        place: string;
-        amount: number;
-      }[] = [];
-      let userBets = [];
-      let notices: string[] = [];
+      // Note: Tải dữ liệu cần thiết song song để giảm thời gian chờ
+      const [old_game, e_bet] = await Promise.all([
+        this.miniGameModel.findById(betId), // Note: Lấy thông tin phiên game
+        this.eConfigModel.findOne({ name: 'e_bet' }), // Note: Lấy cấu hình tỷ lệ cược
+      ]);
 
-      // Fetch user bets
-      const users_bet = await this.userBetModel.find({
-        betId,
-        isEnd: false,
-      });
+      if (!old_game) throw new Error(`Game not found for betId: ${betId}`);
 
-      // Determine winners and update user bets
-      const savePromises = users_bet.map(async (user_bet) => {
-        const { place, typeBet, amount, uid } = user_bet;
+      const s_res = this.showResult(result); // Note: Chuyển đổi kết quả thành định dạng hiển thị
+      const { cl = 1.95, x = 3.2, g = 70 } = e_bet?.option || {}; // Note: Mặc định tỷ lệ nếu không có config
 
-        let rate: number;
-        let isWinner = false;
+      // Note: Lấy tất cả cược chưa kết thúc và xử lý người thắng bằng hàm phụ
+      const users_bet = await this.userBetModel.find({ betId, isEnd: false });
+      const { userBets, users } = await this.updateUserBets(
+        users_bet,
+        { result },
+        cl,
+        x,
+        g,
+        s_res,
+      );
 
-        // Determine rate and winner status based on bet type
-        if (typeBet === 'cl') {
-          rate = cl;
-          const isRes = parseInt(result, 10);
-          isWinner =
-            (isRes % 2 === 0 && place === 'C') ||
-            (isRes % 2 !== 0 && place === 'L') ||
-            (isRes <= 49 && place === 'X') ||
-            (isRes >= 50 && place === 'T');
-        } else if (typeBet === 'x') {
-          rate = x;
-          isWinner = s_res.split('_')[0] === place;
-        } else {
-          rate = g;
-          isWinner = s_res.split('_')[1] === place;
-        }
-
-        // Handle winning bets
-        if (isWinner) {
-          const revice = amount * rate;
-          users.push({ uid, revice, place, amount });
-          user_bet.revice = revice;
-        }
-
-        // Update user bet fields
-        user_bet.isEnd = true;
-        user_bet.status = 2;
-        user_bet.result = result;
-
-        // Save changes
-        await user_bet.save();
-        userBets.push(user_bet.toObject());
-      });
-
-      // Wait for all updates to complete
-      await Promise.all(savePromises);
-
-      const users_res: { _id: string; money: number }[] = [];
-      const userActives: { uid: string; active: Record<string, any> }[] = [];
-      const clans: { clanId: string; score: number }[] = [];
-
-      // Fetch user data
+      // Note: Cập nhật thông tin user, clan và activity bằng hàm phụ
       const list_user = await this.userModel.find({
         _id: { $in: users.map((u) => u.uid) },
       });
+      const { userActives, clans, users_res } = await this.updateUsersAndClans(
+        users,
+        list_user,
+      );
 
-      const saveUserPromises = list_user.map(async (user) => {
-        const winnerData = users.filter((u) => u.uid === user.id);
-
-        for (const winner of winnerData) {
-          const { revice, place, amount } = winner;
-
-          // Add active record for winner
-          userActives.push({
-            uid: user.id,
-            active: {
-              name: 'winer_bet',
-              betId: old_game.id,
-              m_current: user.money,
-              m_new: user.money + revice,
-              place,
-              server: old_game.server,
-              amount,
-            },
-          });
-
-          // Update user's money and metadata
-          user.money += revice;
-          user.meta.totalTrade += revice;
-          user.meta.limitTrade += revice;
-
-          const { clanId = null } = user.meta;
-
-          if (clanId) {
-            // Update user's clan score
-            user.meta.score += revice;
-            const clanIndex = clans.findIndex((c) => c.clanId === clanId);
-
-            if (clanIndex < 0) {
-              clans.push({ clanId, score: revice });
-            } else {
-              clans[clanIndex].score += revice;
-            }
-          }
-
-          // Mark `meta` as modified
-          user.markModified('meta');
-
-          // Create notification for the winner
-          const convert_key = this.convert_key(place);
-          if (amount >= 5e8) {
-            notices.push(
-              `Chúc mừng người chơi ${user.name} đã thắng lớn ${new Intl.NumberFormat('vi').format(revice)} vàng vào ${convert_key}`,
-            );
-          }
-        }
-
-        // Save the updated user
-        try {
-          await user.save();
-          console.log(`Cập nhật thành công cho user: ${user.id}`);
-        } catch (err) {
-          console.error(`Lỗi khi lưu user ${user.id}:`, err);
-        }
-
-        // Add final result to `users_res`
-        users_res.push({ _id: user.id, money: user.money });
-      });
-
-      // Wait for all user updates to complete
-      await Promise.all(saveUserPromises);
-      // Save clan;
-      const bulkOps_clan = clans.map((clan) => ({
+      // Note: Cập nhật điểm clan bằng bulkWrite để tối ưu hiệu suất
+      const bulkOpsClan = clans.map((clan) => ({
         updateOne: {
-          filter: { _id: clan.clanId }, // Filter by clanId
-          update: { $inc: { score: +clan.score } }, // Update score
+          filter: { _id: clan.clanId },
+          update: { $inc: { score: clan.score } },
         },
       }));
-      const clans_bulk = await this.clanModel.bulkWrite(bulkOps_clan);
 
-      // Save active
-      await this.userActiveModel.insertMany(userActives);
-
-      // Send notice result;
-      let split_res = s_res.split('_');
-      let res_key = this.show_result_text(split_res[0]);
-      await this.sendNotiSystem({
-        content: `Máy chủ ${server}: Chúc mừng những người chơi đã chọn ${res_key}_${split_res[1]}`,
-        server: server,
-        uid: 'local',
+      // Note: Chuẩn bị dữ liệu để trả về client
+      const res_clans = clans.map((c) => {
+        return {};
       });
+      // Note: Thực hiện cập nhật clans và user activities song song, đảm bảo userActives luôn chạy kể cả khi không có clans
+      const clans_bulk_promise = bulkOpsClan.length
+        ? this.clanModel.bulkWrite(bulkOpsClan) // Note: Chỉ cập nhật clan nếu có dữ liệu
+        : Promise.resolve(null); // Note: Trả về null nếu không có clan để cập nhật
 
-      // Send notice;
-      if (notices.length > 0) {
-        await this.sendNotiSystem({
-          content: 'Xin chức mừng những người chơi sau:\n' + notices.join('\n'),
-          server: server,
-          uid: 'local',
-        });
-      }
+      const active_promise = userActives.length
+        ? this.userActiveModel.insertMany(userActives) // Note: Lưu tất cả activity nếu có
+        : Promise.resolve([]); // Note: Trả về mảng rỗng nếu không có activity
 
+      // Note: Chờ cả hai promise hoàn tất, nhưng không phụ thuộc lẫn nhau
+      const [clans_bulk, active_result] = await Promise.all([
+        clans_bulk_promise,
+        active_promise,
+      ]);
+
+      // Note: Gửi thông báo hệ thống bằng hàm phụ
+      await this.sendNotifications(old_game, s_res, users);
+
+      // Note: Phát sự kiện socket với dữ liệu cập nhật
       const payload_socket = {
         n_game: old_game.toObject(),
-        userBets: userBets,
+        userBets,
         data_user: users_res,
       };
       this.socketGateway.server.emit('mini.bet', payload_socket);
-      this.socketGateway.server.emit('clan.update.bulk', clans_bulk);
+      // Note: Clans hiện đang không kích hoạt trên FE
+      // if (clans_bulk)
+      //   this.socketGateway.server.emit('clan.update.bulk', clans_bulk);
     } catch (err: any) {
-      this.logger.log('Err Give Prizes Winer MiniGame Client: ', err.message);
+      // Note: Ghi log lỗi chi tiết để debug
+      this.logger.log(
+        `Err Give Prizes Winer MiniGame Client - BetId: ${payload.betId} - Msg: ${err.message}`,
+      );
+      throw err; // Note: Ném lỗi để caller xử lý nếu cần
     }
   }
 
-  async cancelBetMinigame(payload: { betId: string; server: string }) {
+  // Note: Hàm xử lý hoàn tiền cho user khi phiên mini game bị miss
+  async cancelBetMinigame(payload: {
+    betId: string;
+    server: string;
+  }): Promise<void> {
     try {
       const { betId, server } = payload;
 
-      // Fetch necessary data concurrently
+      // Note: Tải dữ liệu song song để tối ưu thời gian
       const [old_game, userBets] = await Promise.all([
-        this.miniGameModel.findById(betId),
-        this.userBetModel.find({ betId, isEnd: false, server }),
+        this.miniGameModel.findById(betId), // Note: Lấy thông tin phiên game
+        this.userBetModel.find({ betId, isEnd: false, server }), // Note: Lấy cược chưa kết thúc
       ]);
 
-      if (!old_game || userBets.length === 0) return;
+      if (!old_game || userBets.length === 0) {
+        this.logger.log(`No game or bets found for betId: ${betId}`);
+        return; // Note: Thoát nếu không có dữ liệu cần xử lý
+      }
 
-      // Update user bets in the database
+      // Note: Cập nhật tất cả cược thành trạng thái refund bằng updateMany để tối ưu
       await this.userBetModel.updateMany(
-        { betId },
-        { status: 1, isEnd: true, result: 'refund' },
+        { betId, isEnd: false },
+        { status: 1, isEnd: true, result: 'refund' }, // Note: Status 1 = đã hoàn tiền
       );
 
-      // Group refunds by user
-      const list_user = userBets.reduce(
-        (acc, ubet) => {
-          const existing = acc.find((u) => u.uid === ubet.uid);
-          if (existing) {
-            existing.refund += ubet.amount;
-          } else {
-            acc.push({
-              uid: ubet.uid,
-              refund: ubet.amount,
-              userBetId: ubet.id,
-              place: ubet.place,
-            });
-          }
-          return acc;
-        },
-        [] as {
-          uid: string;
+      // Note: Chuẩn bị dữ liệu hoàn tiền cho user và activity
+      const refundsByUser = new Map<
+        string,
+        {
           refund: number;
-          userBetId: string;
-          place: string;
-        }[],
-      );
-
-      // Prepare updates for userBets
-      const update_userbets = userBets.map((ubet) => ({
-        ...ubet.toObject(),
-        isEnd: true,
-        status: 1,
-        result: 'refund',
-      }));
-
-      // Fetch all affected users
-      const users = await this.userModel.find({
-        _id: { $in: list_user.map((u) => u.uid) },
+          bets: { userBetId: string; place: string; amount: number }[];
+        }
+      >();
+      const update_userbets = userBets.map((ubet) => {
+        const { uid, amount, id, place } = ubet;
+        if (refundsByUser.has(uid)) {
+          const existing = refundsByUser.get(uid)!;
+          existing.refund += amount;
+          existing.bets.push({ userBetId: id, place, amount });
+        } else {
+          refundsByUser.set(uid, {
+            refund: amount,
+            bets: [{ userBetId: id, place, amount }],
+          });
+        }
+        return { ...ubet.toObject(), isEnd: true, status: 1, result: 'refund' }; // Note: Chuẩn bị dữ liệu trả về
       });
 
-      // Prepare bulkWrite operations for users
-      const userBulkOps = [];
-      const activeBulkOps = [];
-      const update_user = [];
+      const list_user = await this.userModel.find({
+        _id: { $in: Array.from(refundsByUser.keys()) },
+      });
+      const userBulkOps: any[] = [];
+      const activeBulkOps: any[] = [];
+      const update_user: any[] = [];
 
-      for (const user of users) {
-        const target = list_user.find((u) => u.uid === user.id);
-        if (target) {
-          // Prepare user update operation
+      // Note: Xử lý cập nhật user và activity
+      list_user.forEach((user) => {
+        const userRefunds = refundsByUser.get(user.id);
+        if (userRefunds) {
+          const { refund, bets } = userRefunds;
+
+          // Note: Chuẩn bị bulkWrite để cập nhật tiền user
           userBulkOps.push({
             updateOne: {
               filter: { _id: user.id },
-              update: { $inc: { money: target.refund } },
+              update: { $inc: { money: refund } },
             },
           });
 
-          // Prepare active record creation
-          activeBulkOps.push({
-            insertOne: {
-              document: {
-                uid: target.uid,
-                active: {
-                  name: 'cancel_bet',
-                  userBetId: target.userBetId,
-                  m_current: user.money,
-                  m_new: user.money + target.refund,
-                  betId: betId,
-                  amount: target.refund,
-                  place: target.place,
+          // Note: Ghi lại hoạt động hoàn tiền cho từng cược
+          bets.forEach((bet) => {
+            activeBulkOps.push({
+              insertOne: {
+                document: {
+                  uid: user.id,
+                  active: {
+                    name: 'cancel_bet',
+                    userBetId: bet.userBetId,
+                    m_current: user.money,
+                    m_new: user.money + refund, // Note: Tổng tiền sau hoàn
+                    betId,
+                    amount: bet.amount,
+                    place: bet.place,
+                  },
                 },
               },
-            },
+            });
           });
 
-          // Exclude sensitive fields and prepare response
+          // Note: Chuẩn bị dữ liệu trả về, loại bỏ thông tin nhạy cảm
           const { pwd_h, email, ...res } = user.toObject();
-          res.money += target.refund; // Update the new money in response
+          res.money += refund;
           update_user.push(res);
         }
-      }
+      });
 
-      // Execute bulkWrite operations
-      await Promise.all([
-        this.userModel.bulkWrite(userBulkOps),
-        this.userActiveModel.bulkWrite(activeBulkOps),
+      // Note: Thực hiện tất cả cập nhật database song song và phát sự kiện bulk update
+      const user_bulk_promise = userBulkOps.length
+        ? this.userModel.bulkWrite(userBulkOps) // Note: Cập nhật hàng loạt user nếu có dữ liệu
+        : Promise.resolve(null); // Note: Trả về null nếu không có user để cập nhật
+
+      const active_bulk_promise = activeBulkOps.length
+        ? this.userActiveModel.bulkWrite(activeBulkOps) // Note: Lưu hàng loạt activity nếu có dữ liệu
+        : Promise.resolve(null); // Note: Trả về null nếu không có activity để lưu
+
+      // Note: Chờ cả hai bulk operation hoàn tất và lấy kết quả
+      const [user_bulk_result, active_bulk_result] = await Promise.all([
+        user_bulk_promise,
+        active_bulk_promise,
       ]);
 
-      // Emit socket event
+      // Note: Phát sự kiện socket với dữ liệu cập nhật chính
       const payload_socket = {
         n_game: old_game.toObject(),
         userBets: update_userbets,
         data_user: update_user,
       };
       this.socketGateway.server.emit('mini.bet', payload_socket);
+
+      // Note: Phát sự kiện cập nhật user hàng loạt nếu có kết quả bulkWrite
+      if (user_bulk_result) {
+        let res_u_s = update_user.map((up) => {
+          let { _id, money, meta } = up;
+          return { _id, money, meta };
+        });
+        this.socketGateway.server.emit('user.update.bulk', res_u_s);
+      }
     } catch (err: any) {
-      this.logger.log('Err Cancel MiniGame Client: ', err.message);
+      // Note: Ghi log lỗi chi tiết để debug
+      this.logger.log(
+        `Err Cancel MiniGame Client - BetId: ${payload.betId} - Msg: ${err.message}`,
+      );
+      throw err; // Note: Ném lỗi để caller xử lý nếu cần
     }
   }
 
+  // Note: Hàm tạo phiên mini game mới
   async CreateNewMiniGame(payload: CreateMiniGame) {
     try {
       const newMiniGame = await this.miniGameModel.create(payload);
