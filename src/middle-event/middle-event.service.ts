@@ -173,6 +173,7 @@ export class MiddleEventService {
       const { userActives, clans, users_res } = await this.updateUsersAndClans(
         users,
         list_user,
+        old_game.id,
       );
 
       // Note: Cập nhật điểm clan bằng bulkWrite để tối ưu hiệu suất
@@ -303,7 +304,7 @@ export class MiddleEventService {
   }
 
   // Note: Hàm phụ để cập nhật thông tin user và clan, hỗ trợ user thắng nhiều userbet
-  async updateUsersAndClans(users: any[], list_user: any[]) {
+  async updateUsersAndClans(users: any[], list_user: any[], betId: string) {
     const userActives: any[] = [];
     const clans: { clanId: string; score: number }[] = [];
     const users_res: { _id: string; money: number }[] = [];
@@ -365,6 +366,7 @@ export class MiddleEventService {
               place: win.place,
               amount: win.amount,
               revice: win.revice,
+              betId: betId,
             },
           });
         });
@@ -912,6 +914,7 @@ export class MiddleEventService {
       const { userActives, clans, users_res } = await this.updateUsersAndClans(
         users,
         list_user,
+        old_game.id,
       );
 
       // Note: Cập nhật điểm clan bằng bulkWrite để tối ưu hiệu suất
