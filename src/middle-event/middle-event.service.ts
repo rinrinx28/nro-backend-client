@@ -256,11 +256,12 @@ export class MiddleEventService {
       revice: number;
       place: string;
       amount: number;
+      name: string;
     }[] = [];
 
     // Note: Dùng Promise.all để xử lý đồng thời tất cả user bets
     const updatePromises = users_bet.map(async (user_bet) => {
-      const { place, typeBet, amount, uid } = user_bet;
+      const { place, typeBet, amount, uid, meta } = user_bet;
       let rate: number;
       let isWinner = false;
 
@@ -288,7 +289,13 @@ export class MiddleEventService {
       // Note: Nếu thắng, tính tiền thưởng và thêm vào danh sách người thắng
       if (isWinner) {
         user_bet.revice = amount * rate;
-        users.push({ uid, revice: user_bet.revice, place, amount });
+        users.push({
+          uid,
+          revice: user_bet.revice,
+          place,
+          amount,
+          name: meta.name,
+        });
       }
 
       // Note: Cập nhật trạng thái bet (đã kết thúc) và lưu vào DB
@@ -396,7 +403,7 @@ export class MiddleEventService {
       .filter((w) => w.amount >= 5e8)
       .map(
         (w) =>
-          `Chúc mừng người chơi đã thắng ${new Intl.NumberFormat('vi').format(w.revice)} vàng vào ${this.convert_key(w.place)}`,
+          `Chúc mừng người chơi ${w.name} đã thắng ${new Intl.NumberFormat('vi').format(w.revice)} vàng vào ${this.convert_key(w.place)}`,
       );
     if (notices.length > 0) {
       await this.sendNotiSystem({
