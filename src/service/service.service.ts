@@ -9,6 +9,7 @@ import { EConfig } from 'src/middle-event/schema/config.schema';
 import * as moment from 'moment';
 import { Mutex } from 'async-mutex';
 import { Cron } from 'src/middle-event/schema/cron.schema';
+import { HttpService } from '@nestjs/axios';
 
 interface UpdateService {
   id: string;
@@ -40,6 +41,7 @@ export class ServiceService {
     @InjectModel(Cron.name)
     private readonly cronModel: Model<Cron>,
     private readonly socketGateway: SocketGateway,
+    private readonly httpService: HttpService,
   ) {}
 
   private logger: Logger = new Logger('Service');
@@ -126,6 +128,7 @@ export class ServiceService {
       if (!eShopConfig?.isEnable)
         throw new Error('Chức năng nạp/rút tạm đóng!');
       if (!target_s) throw new Error('Không tìm thấy Giao Dịch');
+      const user = await this.userModel.findById(target_s.uid);
 
       const { type, amount, uid } = target_s.toObject();
       this.logger.log(`Update Service: ${id} - Status: ${typeUpdate}`);
@@ -168,6 +171,9 @@ export class ServiceService {
             serviceId: service._id.toString(),
           });
           emitServiceUpdate(updatedService);
+          await this.sendLogsServices(
+            `[${target_s.type === '0' ? 'Rút Thỏi vàng' : target_s.type === '1' ? 'Rút vàng' : target_s.type === '2' ? 'Nạp thỏi vàng' : 'Nạp vàng'} thành công] ServiceId: ${target_s.id} - Tên hiển thị: ${user.username} - UserId: ${target_s.uid} - Tên nhân vật: ${target_s.playerName} - ID Nhân vật: ${target_s.playerId} - Số thỏi/vàng: ${target_s.amount} - Server: ${target_s.server}`,
+          );
           return 'ok';
       }
     } catch (err: any) {
@@ -429,6 +435,19 @@ export class ServiceService {
       this.socketGateway.server.emit('user.update', res_u);
     } catch (err: any) {
       this.logger.log(`Err Add Diamon User: ${err.message}`);
+    }
+  }
+
+  async sendLogsServices(msg: string) {
+    try {
+      await this.httpService.axiosRef.post(process.env.LOGS_SERVICE_DS_WB, {
+        content: '```\n' + `${msg}\n` + '```',
+        avatar_url: 'https://www.nrogame.me/image/icon.png',
+      });
+      return true;
+    } catch (err: any) {
+      this.logger.log('Đã xảy ra lỗi với Logs Nap/rut Discord');
+      return true;
     }
   }
 }

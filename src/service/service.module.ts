@@ -10,6 +10,7 @@ import {
 import { SocketModule } from 'src/socket/socket.module';
 import { EConfig, EConfigSchema } from 'src/middle-event/schema/config.schema';
 import { Cron, CronSchema } from 'src/middle-event/schema/cron.schema';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -30,6 +31,7 @@ import { Cron, CronSchema } from 'src/middle-event/schema/cron.schema';
       { name: Cron.name, schema: CronSchema },
     ]),
     SocketModule,
+    HttpModule,
   ],
   providers: [ServiceService],
   exports: [ServiceService],
