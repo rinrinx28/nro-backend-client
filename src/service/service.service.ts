@@ -185,7 +185,7 @@ export class ServiceService {
             \n- UserId: ${target_s.uid} 
             \n- Tên nhân vật: ${target_s.playerName} 
             \n- ID Nhân vật: ${target_s.playerId} 
-            \n- Số thỏi/vàng: ${target_s.amount} 
+            \n- Số thỏi/vàng: ${this.stringToNumberFormat(target_s.amount)} 
             \n- Server: ${target_s.server}`,
           );
           return 'ok';
@@ -463,5 +463,8 @@ export class ServiceService {
       this.logger.log('Đã xảy ra lỗi với Logs Nap/rut Discord');
       return true;
     }
+  }
+  stringToNumberFormat(value: any) {
+    return new Intl.NumberFormat('vi').format(Number(value));
   }
 }
