@@ -181,7 +181,7 @@ export class ServiceService {
                     ? 'Nạp thỏi vàng'
                     : 'Nạp vàng'
             } thành công] ServiceId: ${target_s.id} 
-            \n- Tên hiển thị: ${user.username} 
+            \n- Tên hiển thị: ${user.name} 
             \n- UserId: ${target_s.uid} 
             \n- Tên nhân vật: ${target_s.playerName} 
             \n- ID Nhân vật: ${target_s.playerId} 
