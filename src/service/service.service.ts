@@ -172,7 +172,21 @@ export class ServiceService {
           });
           emitServiceUpdate(updatedService);
           await this.sendLogsServices(
-            `[${target_s.type === '0' ? 'Rút Thỏi vàng' : target_s.type === '1' ? 'Rút vàng' : target_s.type === '2' ? 'Nạp thỏi vàng' : 'Nạp vàng'} thành công] ServiceId: ${target_s.id} - Tên hiển thị: ${user.username} - UserId: ${target_s.uid} - Tên nhân vật: ${target_s.playerName} - ID Nhân vật: ${target_s.playerId} - Số thỏi/vàng: ${target_s.amount} - Server: ${target_s.server}`,
+            `[${
+              target_s.type === '0'
+                ? 'Rút Thỏi vàng'
+                : target_s.type === '1'
+                  ? 'Rút vàng'
+                  : target_s.type === '2'
+                    ? 'Nạp thỏi vàng'
+                    : 'Nạp vàng'
+            } thành công] ServiceId: ${target_s.id} 
+            \n- Tên hiển thị: ${user.username} 
+            \n- UserId: ${target_s.uid} 
+            \n- Tên nhân vật: ${target_s.playerName} 
+            \n- ID Nhân vật: ${target_s.playerId} 
+            \n- Số thỏi/vàng: ${target_s.amount} 
+            \n- Server: ${target_s.server}`,
           );
           return 'ok';
       }

@@ -143,7 +143,10 @@ export class MiddleEventService {
       old_game.result = res.result;
       await old_game.save();
       await this.sendLogsServerDiscord(
-        `Kết thúc phiên Bet sv: 24 - betId: ${old_game.id} - Kết quả: ${res.result} - Thời gian kết thúc: ${new Date(`${old_game.timeEnd}`).toLocaleString()}`,
+        `Kết thúc phiên Bet sv: 24 
+        \n- betId: ${old_game.id} 
+        \n- Kết quả: ${res.result} 
+        \n- Thời gian kết thúc: ${new Date(`${old_game.timeEnd}`).toLocaleString()}`,
       );
 
       // Note: Chuyển đổi kết quả thành định dạng hiển thị (e.g., "12_[kq]")
@@ -444,7 +447,10 @@ export class MiddleEventService {
       });
       this.logger.log(`Create BET 24: bet_id:${mini_g.id} - Res: ${res}`);
       await this.sendLogsServerDiscord(
-        `Tạo phiên BET mới sv: 24 - BetId:${mini_g.id} - Kết quả: ${res} - Thời gian kết thúc: ${payload.timeEnd.toLocaleString()}`,
+        `Tạo phiên BET mới sv: 24 
+        \n- BetId:${mini_g.id} 
+        \n- Kết quả: ${res} 
+        \n- Thời gian kết thúc: ${payload.timeEnd.toLocaleString()}`,
       );
       return mini_g;
     } catch (err: any) {
@@ -769,7 +775,9 @@ export class MiddleEventService {
           n_game: updatedSession.toObject(),
         });
         await this.sendLogsServerDiscord(
-          `Kết thúc phiên Bet sv: ${updatedSession.server} - Kết quả cuối: ${updatedSession.lastResult} - Thời gian kết thúc: ${new Date(`${updatedSession.timeEnd}`).toLocaleString()}`,
+          `Kết thúc phiên Bet sv: ${updatedSession.server} 
+          \n- Kết quả cuối: ${updatedSession.lastResult} 
+          \n- Thời gian kết thúc: ${new Date(`${updatedSession.timeEnd}`).toLocaleString()}`,
         );
       } else {
         // Note: Ngăn spam: kiểm tra khoảng cách thời gian cập nhật
@@ -816,7 +824,11 @@ export class MiddleEventService {
           timeEnd: this.addSeconds(new Date(), seconds),
         }),
         this.sendLogsServerDiscord(
-          `Refund phiên bet sv: ${latestSession.server} - BetId: ${latestSession.id} - Kết quả trước: ${latestSession.lastResult} - kết quả: refund - Thời gian kết thúc: ${new Date(`${latestSession.timeEnd}`).toLocaleString()}`,
+          `Refund phiên bet sv: ${latestSession.server} 
+          \n- BetId: ${latestSession.id} 
+          \n- Kết quả trước: ${latestSession.lastResult} 
+          \n- kết quả: refund
+          \n- Thời gian kết thúc: ${new Date(`${latestSession.timeEnd}`).toLocaleString()}`,
         ),
       ]);
 
@@ -865,7 +877,11 @@ export class MiddleEventService {
             timeEnd: this.addSeconds(new Date(), seconds),
           }),
           this.sendLogsServerDiscord(
-            `Trao thưởng phiên bet sv: ${oldSession.server} - BetId: ${oldSession.id} - Kết quả trước: ${oldSession.lastResult} - kết quả: ${result} - Thời gian kết thúc: ${new Date(`${oldSession.timeEnd}`).toLocaleString()}`,
+            `Trao thưởng phiên bet sv: ${oldSession.server} 
+            \n- BetId: ${oldSession.id} 
+            \n- Kết quả trước: ${oldSession.lastResult} 
+            \n- kết quả: ${result} 
+            \n- Thời gian kết thúc: ${new Date(`${oldSession.timeEnd}`).toLocaleString()}`,
           ),
         ]);
       } else {
@@ -886,7 +902,11 @@ export class MiddleEventService {
               timeEnd: this.addSeconds(new Date(), seconds),
             }),
             this.sendLogsServerDiscord(
-              `Refund phiên bet sv: ${oldSession.server} - BetId: ${oldSession.id} - Kết quả trước: ${oldSession.lastResult} - kết quả: refund - Thời gian kết thúc: ${new Date(`${oldSession.timeEnd}`).toLocaleString()}`,
+              `Refund phiên bet sv: ${oldSession.server} 
+              \n- BetId: ${oldSession.id} 
+              \n- Kết quả trước: ${oldSession.lastResult} 
+              \n- kết quả: refund
+              \n- Thời gian kết thúc: ${new Date(`${oldSession.timeEnd}`).toLocaleString()}`,
             ),
           ]);
         } else {
@@ -1143,7 +1163,10 @@ export class MiddleEventService {
         `Create MiniGame Client: ${newMiniGame.id} - ${payload.server}`,
       );
       await this.sendLogsServerDiscord(
-        `Tạo phiên Bet mới sv: ${newMiniGame.server} - BetId: ${newMiniGame.id} - Kết quả cuối: ${newMiniGame.lastResult} - Thời gian kết thúc: ${new Date(`${newMiniGame.timeEnd}`).toLocaleString()}`,
+        `Tạo phiên Bet mới sv: ${newMiniGame.server} 
+        \n- BetId: ${newMiniGame.id} 
+        \n- Kết quả cuối: ${newMiniGame.lastResult} 
+        \n- Thời gian kết thúc: ${new Date(`${newMiniGame.timeEnd}`).toLocaleString()}`,
       );
     } catch (err: any) {
       this.logger.log(
