@@ -17,6 +17,7 @@ import { Mutex } from 'async-mutex';
 import * as moment from 'moment';
 import { Jackpot } from './schema/jackpot';
 import { Cron } from './schema/cron.schema';
+import { HttpService } from '@nestjs/axios';
 
 interface IData {
   uuid: string;
@@ -50,6 +51,7 @@ export class MiddleEventService {
     private readonly JackpotModel: Model<Jackpot>,
     @InjectModel(Cron.name)
     private readonly cronModel: Model<Cron>,
+    private readonly httpService: HttpService,
   ) {}
   private logger: Logger = new Logger('Middle Handler');
   private readonly mutexMap = new Map<string, Mutex>();
@@ -140,6 +142,9 @@ export class MiddleEventService {
       old_game.isEnd = true;
       old_game.result = res.result;
       await old_game.save();
+      await this.sendLogsServerDiscord(
+        `Kết thúc phiên Bet sv: 24 - betId: ${old_game.id} - Kết quả: ${res.result} - Thời gian kết thúc: ${new Date(`${old_game.timeEnd}`).toLocaleString()}`,
+      );
 
       // Note: Chuyển đổi kết quả thành định dạng hiển thị (e.g., "12_[kq]")
       const s_res = this.showResult(res.result);
@@ -411,6 +416,9 @@ export class MiddleEventService {
         server: old_game.server,
         uid: 'local',
       });
+      await this.sendBetWinDiscord(
+        'Xin chúc mừng những người chơi sau:\n' + notices.join('\n'),
+      );
     }
   }
 
@@ -435,6 +443,9 @@ export class MiddleEventService {
         result: `${res}`,
       });
       this.logger.log(`Create BET 24: bet_id:${mini_g.id} - Res: ${res}`);
+      await this.sendLogsServerDiscord(
+        `Tạo phiên BET mới sv: 24 - BetId:${mini_g.id} - Kết quả: ${res} - Thời gian kết thúc: ${payload.timeEnd.toLocaleString()}`,
+      );
       return mini_g;
     } catch (err: any) {
       this.logger.log(`Err Create BET 24: Msg: ${err.message}`);
@@ -757,6 +768,9 @@ export class MiddleEventService {
         this.socketGateway.server.emit('mini.bet', {
           n_game: updatedSession.toObject(),
         });
+        await this.sendLogsServerDiscord(
+          `Kết thúc phiên Bet sv: ${updatedSession.server} - Kết quả cuối: ${updatedSession.lastResult} - Thời gian kết thúc: ${new Date(`${updatedSession.timeEnd}`).toLocaleString()}`,
+        );
       } else {
         // Note: Ngăn spam: kiểm tra khoảng cách thời gian cập nhật
         if (now - currentUpdate < 10) {
@@ -801,6 +815,9 @@ export class MiddleEventService {
           lastResult: values.join('-'),
           timeEnd: this.addSeconds(new Date(), seconds),
         }),
+        this.sendLogsServerDiscord(
+          `Refund phiên bet sv: ${latestSession.server} - BetId: ${latestSession.id} - Kết quả trước: ${latestSession.lastResult} - kết quả: refund - Thời gian kết thúc: ${new Date(`${latestSession.timeEnd}`).toLocaleString()}`,
+        ),
       ]);
 
       throw new Error(
@@ -847,6 +864,9 @@ export class MiddleEventService {
             lastResult: values.join('-'),
             timeEnd: this.addSeconds(new Date(), seconds),
           }),
+          this.sendLogsServerDiscord(
+            `Trao thưởng phiên bet sv: ${oldSession.server} - BetId: ${oldSession.id} - Kết quả trước: ${oldSession.lastResult} - kết quả: ${result} - Thời gian kết thúc: ${new Date(`${oldSession.timeEnd}`).toLocaleString()}`,
+          ),
         ]);
       } else {
         const isMissSession = seconds <= 280;
@@ -865,6 +885,9 @@ export class MiddleEventService {
               lastResult: values.join('-'),
               timeEnd: this.addSeconds(new Date(), seconds),
             }),
+            this.sendLogsServerDiscord(
+              `Refund phiên bet sv: ${oldSession.server} - BetId: ${oldSession.id} - Kết quả trước: ${oldSession.lastResult} - kết quả: refund - Thời gian kết thúc: ${new Date(`${oldSession.timeEnd}`).toLocaleString()}`,
+            ),
           ]);
         } else {
           throw new Error(
@@ -1119,6 +1142,9 @@ export class MiddleEventService {
       this.logger.log(
         `Create MiniGame Client: ${newMiniGame.id} - ${payload.server}`,
       );
+      await this.sendLogsServerDiscord(
+        `Tạo phiên Bet mới sv: ${newMiniGame.server} - BetId: ${newMiniGame.id} - Kết quả cuối: ${newMiniGame.lastResult} - Thời gian kết thúc: ${new Date(`${newMiniGame.timeEnd}`).toLocaleString()}`,
+      );
     } catch (err: any) {
       this.logger.log(
         `Err Create MiniGame Client: ${err.message} - ${payload.server}`,
@@ -1152,6 +1178,32 @@ export class MiddleEventService {
       return 'Lẻ Xỉu';
     }
     return res;
+  }
+
+  async sendLogsServerDiscord(msg: string) {
+    try {
+      await this.httpService.axiosRef.post(process.env.LOGS_SV_STATUS_DS_WB, {
+        content: '```\n' + `${msg}\n` + '```',
+        avatar_url: 'https://www.nrogame.me/image/icon.png',
+      });
+      return true;
+    } catch (err: any) {
+      this.logger.log('Đã xảy ra lỗi với discord Logs Server Status');
+      return true;
+    }
+  }
+
+  async sendBetWinDiscord(msg: string) {
+    try {
+      await this.httpService.axiosRef.post(process.env.LOGS_BET_WIN_DS_WB, {
+        content: '```\n' + `${msg}\n` + '```',
+        avatar_url: 'https://www.nrogame.me/image/icon.png',
+      });
+      return true;
+    } catch (err: any) {
+      this.logger.log('Đã xảy ra lỗi với discord Logs Bet Win');
+      return true;
+    }
   }
 }
 

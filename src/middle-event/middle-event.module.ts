@@ -18,6 +18,7 @@ import { Clan, ClanSchema } from './schema/clan.schema';
 import { Session, SessionSchema } from './schema/ISession.schema';
 import { Jackpot, JackpotSchema } from './schema/jackpot';
 import { Cron, CronSchema } from './schema/cron.schema';
+import { HttpModule } from '@nestjs/axios';
 
 @Module({
   imports: [
@@ -57,6 +58,7 @@ import { Cron, CronSchema } from './schema/cron.schema';
       { name: Cron.name, schema: CronSchema },
     ]),
     SocketModule,
+    HttpModule,
   ],
   providers: [MiddleEventService],
 })
