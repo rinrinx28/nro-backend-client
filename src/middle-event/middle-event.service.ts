@@ -1188,6 +1188,7 @@ export class MiddleEventService {
       });
       return true;
     } catch (err: any) {
+      console.log(err);
       this.logger.log('Đã xảy ra lỗi với discord Logs Server Status');
       return true;
     }
@@ -1201,6 +1202,7 @@ export class MiddleEventService {
       });
       return true;
     } catch (err: any) {
+      console.log(err);
       this.logger.log('Đã xảy ra lỗi với discord Logs Bet Win');
       return true;
     }
