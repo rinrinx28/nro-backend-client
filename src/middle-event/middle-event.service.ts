@@ -79,7 +79,9 @@ export class MiddleEventService {
 
   @OnEvent('notice.info', { async: true })
   async handleNoticeInfo(payload: NoticeInfoEvent) {
-    await this.miniGameClient(payload);
+    // Note: Remove using data from game client
+    // await this.miniGameClient(payload);
+    return null;
   }
 
   @OnEvent('mini.bet.info', { async: true })
