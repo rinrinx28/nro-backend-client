@@ -554,7 +554,7 @@ export class MiddleEventService {
 
     // Note: Gửi thông báo kết quả chung cho tất cả người chơi
     await this.sendNotiSystem({
-      content: `Máy chủ 24: Chúc mừng những người chơi đã chọn ${res_key}_${split_res[1]}`,
+      content: `Máy chủ ${old_game.server}: Chúc mừng những người chơi đã chọn ${res_key}_${split_res[1]}`,
       server: old_game.server,
       uid: 'local',
     });
@@ -572,9 +572,9 @@ export class MiddleEventService {
         server: old_game.server,
         uid: 'local',
       });
-      await this.sendBetWinDiscord(
-        'Xin chúc mừng những người chơi sau:\n' + notices.join('\n'),
-      );
+      // await this.sendBetWinDiscord(
+      //   'Xin chúc mừng những người chơi sau:\n' + notices.join('\n'),
+      // );
     }
   }
 
