@@ -99,7 +99,6 @@ export class MiddleEventService {
     }
   }
 
-  // Update Code by Grok AI
   @OnEvent('mini.server.24', { async: true })
   async handleMiniServer24(status: string) {
     try {
@@ -245,6 +244,157 @@ export class MiddleEventService {
     } catch (err: any) {
       // Note: Ghi log lỗi tổng quát để dễ dàng theo dõi khi debug
       this.logger.log(`Err BET 24: ${err.message} - Stack: ${err.stack}`);
+      throw err; // Note: Ném lỗi để caller xử lý hoặc dừng luồng
+    }
+  }
+
+  @OnEvent('main.server', { async: true })
+  async handleMainServer(server: string) {
+    try {
+      // Note: Tìm game cũ chưa kết thúc để xử lý, ưu tiên game mới nhất dựa trên updatedAt
+      let old_game = await this.miniGameModel
+        .findOne({ isEnd: false, server: server })
+        .sort({ updatedAt: -1 });
+
+      // Note: Nếu không có old_game (lần đầu chạy hoặc hết thời gian), tạo game mới
+      if (!old_game) {
+        // Note: Lấy 10 kết quả mini game gần nhất để hiển thị lịch sử
+        const old_r_game = await this.resultMiniGameModel
+          .find()
+          .sort({ updatedAt: -1 })
+          .limit(10);
+
+        // Note: Tạo game mới với thời gian kết thúc sau 60 giây
+        const n_game = await this.handlerCreate({
+          server: server,
+          timeEnd: this.addSeconds(new Date(), 280),
+          uuid: 'local',
+          lastResult: old_r_game.map((r) => r.result).join('-'), // Lịch sử kết quả dạng chuỗi
+        });
+
+        // Note: Gửi thông tin game mới qua socket tới tất cả client
+        this.socketGateway.server.emit('mini.bet', {
+          n_game: n_game.toObject(),
+        });
+        return; // Thoát hàm sau khi tạo game mới
+      }
+
+      // Note: Nếu có old_game, lấy kết quả từ resultMiniGameModel
+      const res = await this.resultMiniGameModel.findOne({
+        miniId: old_game.id,
+      });
+      if (!res)
+        throw new Error('Đã xảy ra lỗi đối với hệ thống tính toán phần thưởng'); // Note: Kiểm tra lỗi nếu không tìm thấy kết quả
+
+      // Note: Đánh dấu game cũ là đã kết thúc và lưu kết quả
+      old_game.isEnd = true;
+      old_game.result = res.result;
+      await old_game.save();
+      await this.sendLogsServerDiscord(
+        `Kết thúc phiên Bet sv: ${server}
+        \n- betId: ${old_game.id} 
+        \n- Kết quả: ${res.result} 
+        \n- Thời gian kết thúc: ${new Date(`${old_game.timeEnd}`).toLocaleString()}`,
+      );
+
+      // Note: Chuyển đổi kết quả thành định dạng hiển thị (e.g., "12_[kq]")
+      const s_res = this.showResult(res.result);
+
+      // Note: Lấy cấu hình tỷ lệ cược từ eConfigModel
+      const e_bet = await this.eConfigModel.findOne({ name: 'e_bet' });
+      const { cl = 1.95, x = 3.2, g = 70 } = e_bet.option; // Default values nếu không có config
+
+      // Note: Lấy tất cả user bet chưa kết thúc trong game này
+      const users_bet = await this.userBetModel.find({
+        betId: old_game.id,
+        isEnd: false,
+      });
+
+      // Note: Cập nhật tất cả user bets đồng thời và tìm người thắng
+      const { userBets, users } = await this.updateUserBets(
+        users_bet,
+        res,
+        cl,
+        x,
+        g,
+        s_res,
+      );
+
+      // Note: Lấy thông tin user từ danh sách người thắng
+      const list_user = await this.userModel.find({
+        _id: { $in: users.map((u) => u.uid) },
+      });
+
+      // Note: Cập nhật tiền, meta, clan và lưu hoạt động của user
+      const { userActives, clans, users_res } = await this.updateUsersAndClans(
+        users,
+        list_user,
+        old_game.id,
+      );
+
+      // Note: Cập nhật điểm clan bằng bulkWrite để tối ưu hiệu suất
+      const bulkOpsClan = clans.map((clan) => ({
+        updateOne: {
+          filter: { _id: clan.clanId },
+          update: { $inc: { score: clan.score } },
+        },
+      }));
+      // Note: Thực hiện cập nhật clans và user activities song song, đảm bảo userActives luôn chạy kể cả khi không có clans
+      const clans_bulk_promise = bulkOpsClan.length
+        ? this.clanModel.bulkWrite(bulkOpsClan) // Note: Chỉ cập nhật clan nếu có dữ liệu
+        : Promise.resolve(null); // Note: Trả về null nếu không có clan để cập nhật
+
+      const active_promise = userActives.length
+        ? this.userActiveModel.insertMany(userActives) // Note: Lưu tất cả activity nếu có
+        : Promise.resolve([]); // Note: Trả về mảng rỗng nếu không có activity
+
+      // Note: Chờ cả hai promise hoàn tất, nhưng không phụ thuộc lẫn nhau
+      const [clans_bulk, active_result] = await Promise.all([
+        clans_bulk_promise,
+        active_promise,
+      ]);
+
+      // Note: Gửi thông báo kết quả và thông báo thắng lớn qua hệ thống
+      await this.sendNotifications(old_game, s_res, users);
+
+      // Note: Nếu kết quả là "99", kích hoạt jackpot
+      // if (res.result === '99') {
+      //   await this.sendJackpot({ server: server, betId: old_game.id });
+      // }
+
+      // Note: Tạo game mới sau khi xử lý xong game cũ
+      const last_res = await this.resultMiniGameModel
+        .find()
+        .sort({ updatedAt: -1 })
+        .limit(10);
+      const n_game = await this.handlerCreate({
+        server: server,
+        timeEnd: this.addSeconds(new Date(), 60),
+        uuid: 'local',
+        lastResult: last_res.map((r) => r.result).join('-'),
+      });
+
+      // Note: Chuẩn bị payload để gửi qua socket: game mới, kết quả bet, thông tin user
+      const payload = {
+        n_game: n_game.toObject(),
+        userBets, // Danh sách các bet đã cập nhật
+        data_user: users_res, // Thông tin user sau khi cập nhật tiền
+      };
+
+      // Note: Gửi thông tin cập nhật qua socket cho client
+      this.socketGateway.server.emit('mini.bet', payload);
+
+      // Note: Clans hiện đang không kích hoạt trên FE
+      // if (clans_bulk) {
+      //   this.socketGateway.server.emit('clan.update.bulk', clans_bulk); // Note: Cập nhật clan cho client
+      // }
+
+      return payload; // Note: Trả về payload để debug hoặc xử lý tiếp nếu cần
+    } catch (err: any) {
+      // Note: Ghi log lỗi tổng quát để dễ dàng theo dõi khi debug
+      this.logger.log(
+        `Err BET ${server}: ${err.message} - Stack: ${err.stack}`,
+      );
       throw err; // Note: Ném lỗi để caller xử lý hoặc dừng luồng
     }
   }
