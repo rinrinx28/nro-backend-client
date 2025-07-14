@@ -372,7 +372,7 @@ export class MiddleEventService {
         .limit(10);
       const n_game = await this.handlerCreate({
         server: server,
-        timeEnd: this.addSeconds(new Date(), 60),
+        timeEnd: this.addSeconds(new Date(), 280),
         uuid: 'local',
         lastResult: last_res.map((r) => r.result).join('-'),
       });
