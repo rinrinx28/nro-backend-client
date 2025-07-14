@@ -292,6 +292,7 @@ export class MiddleEventService {
       old_game.isEnd = true;
       old_game.result = res.result;
       await old_game.save();
+
       await this.sendLogsServerDiscord(
         `Kết thúc phiên Bet sv: ${server}
         \n- betId: ${old_game.id} 
@@ -1363,7 +1364,6 @@ export class MiddleEventService {
       });
       return true;
     } catch (err: any) {
-      console.log(err);
       this.logger.log('Đã xảy ra lỗi với discord Logs Server Status');
       return true;
     }
