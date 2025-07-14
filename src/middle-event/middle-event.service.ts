@@ -598,16 +598,18 @@ export class MiddleEventService {
         miniId: mini_g.id,
         result: `${res}`,
       });
-      this.logger.log(`Create BET 24: bet_id:${mini_g.id} - Res: ${res}`);
-      await this.sendLogsServerDiscord(
-        `Tạo phiên BET mới sv: 24 
-        \n- BetId:${mini_g.id} 
-        \n- Kết quả: ${res} 
-        \n- Thời gian kết thúc: ${payload.timeEnd.toLocaleString()}`,
+      this.logger.log(
+        `Create BET ${mini_g.server}: bet_id:${mini_g.id} - Res: ${res}`,
       );
+      // await this.sendLogsServerDiscord(
+      //   `Tạo phiên BET mới sv: 24
+      //   \n- BetId:${mini_g.id}
+      //   \n- Kết quả: ${res}
+      //   \n- Thời gian kết thúc: ${payload.timeEnd.toLocaleString()}`,
+      // );
       return mini_g;
     } catch (err: any) {
-      this.logger.log(`Err Create BET 24: Msg: ${err.message}`);
+      this.logger.log(`Err Create BET ${payload.server}: Msg: ${err.message}`);
       return;
     }
   }
