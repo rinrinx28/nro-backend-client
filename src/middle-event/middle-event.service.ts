@@ -293,12 +293,12 @@ export class MiddleEventService {
       old_game.result = res.result;
       await old_game.save();
 
-      await this.sendLogsServerDiscord(
-        `Kết thúc phiên Bet sv: ${server}
-        \n- betId: ${old_game.id} 
-        \n- Kết quả: ${res.result} 
-        \n- Thời gian kết thúc: ${new Date(`${old_game.timeEnd}`).toLocaleString()}`,
-      );
+      // await this.sendLogsServerDiscord(
+      //   `Kết thúc phiên Bet sv: ${server}
+      //   \n- betId: ${old_game.id}
+      //   \n- Kết quả: ${res.result}
+      //   \n- Thời gian kết thúc: ${new Date(`${old_game.timeEnd}`).toLocaleString()}`,
+      // );
 
       // Note: Chuyển đổi kết quả thành định dạng hiển thị (e.g., "12_[kq]")
       const s_res = this.showResult(res.result);
