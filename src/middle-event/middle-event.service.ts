@@ -113,7 +113,7 @@ export class MiddleEventService {
       if (!old_game) {
         // Note: Lấy 10 kết quả mini game gần nhất để hiển thị lịch sử
         const old_r_game = await this.resultMiniGameModel
-          .find()
+          .find({ server: '24' })
           .sort({ updatedAt: -1 })
           .limit(10);
 
@@ -217,7 +217,7 @@ export class MiddleEventService {
 
       // Note: Tạo game mới sau khi xử lý xong game cũ
       const last_res = await this.resultMiniGameModel
-        .find()
+        .find({ server: '24' })
         .sort({ updatedAt: -1 })
         .limit(10);
       const n_game = await this.handlerCreate({
@@ -262,7 +262,7 @@ export class MiddleEventService {
       if (!old_game) {
         // Note: Lấy 10 kết quả mini game gần nhất để hiển thị lịch sử
         const old_r_game = await this.resultMiniGameModel
-          .find()
+          .find({ server: server })
           .sort({ updatedAt: -1 })
           .limit(10);
 
@@ -367,7 +367,7 @@ export class MiddleEventService {
 
       // Note: Tạo game mới sau khi xử lý xong game cũ
       const last_res = await this.resultMiniGameModel
-        .find()
+        .find({ server: server })
         .sort({ updatedAt: -1 })
         .limit(10);
       const n_game = await this.handlerCreate({
@@ -597,6 +597,7 @@ export class MiddleEventService {
       await this.resultMiniGameModel.create({
         miniId: mini_g.id,
         result: `${res}`,
+        server: mini_g.server,
       });
       this.logger.log(
         `Create BET ${mini_g.server}: bet_id:${mini_g.id} - Res: ${res}`,

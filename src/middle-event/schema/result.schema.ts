@@ -13,6 +13,9 @@ export class ResultMiniGame {
   @Prop()
   result: string;
 
+  @Prop()
+  server?: string;
+
   updatedAt?: Date;
   createdAt?: Date;
 }
